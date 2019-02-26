@@ -1,8 +1,9 @@
 #pragma once
 
 #include <stdlib.h>
+#include <stdio.h>
 
-#define RND0_1 ((double) random() / ((long long)1<<31))
+#define RND0_1 ((double) rand() / ((long long)1<<31))
 #define G 6.67408e-11
 #define EPSLON 0.01
 
