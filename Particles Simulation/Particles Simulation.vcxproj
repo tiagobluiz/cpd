@@ -22,6 +22,9 @@
     <ClCompile Include="init_particles.c" />
     <ClCompile Include="Main.c" />
   </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="Header.h" />
+  </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>
     <ProjectGuid>{0C375712-2EC5-466C-AF3C-82ABEF887FA0}</ProjectGuid>
