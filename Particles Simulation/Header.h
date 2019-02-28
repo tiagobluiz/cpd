@@ -2,6 +2,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <math.h>
 
 #define RND0_1 ((double) random() / ((long long)1<<31))
 #define G 6.67408e-11
@@ -14,5 +15,12 @@ typedef struct {
 	double vy;
 	double m;
 }particle_t;
+
+typedef struct {
+	double x;
+	double y;
+	double m;
+	particle_t ** particles;
+}cell;
 
 void init_particles(long seed, long ncside, long long n_part, particle_t* par);

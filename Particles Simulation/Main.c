@@ -1,9 +1,9 @@
 #include "Header.h"
 
-void main(int args_length, char* args[]) {
+int main(int args_length, char* args[]) {
 	if (args_length < 4) {
 		printf("Incorrect number of arguments! It should be 4!");
-		return;
+		return -1;
 	}
 
 	//init
@@ -18,6 +18,7 @@ void main(int args_length, char* args[]) {
 
 
 
+
 	free(particles);
 }
 
@@ -29,7 +30,22 @@ double computeAcceleration(double force, double mass) {
 	return force / mass;
 }
 
-double computeCellMass(particle_t * particles, int length) {
+double computeVelocity(double currVelocity, double acceleration, double delta){
+    return currVelocity * acceleration * delta;
+}
+
+void computeParticlePosition(double * x, double * y, double velocity, double acceleration, double delta){
+    *x = *x + velocity + 1/2 * acceleration * exp2(delta);
+    *y = *y + velocity + 1/2 * acceleration * exp2(delta);
+}
+
+void computeCellMass(particle_t * particles, int length, double * X, double * Y) {
+
+    for (int i = 0; i < length; i++){
+        
+    }
+
+
 	double totalY = 0;
 	double totalX = 0;
 	double totalMax = 0;
@@ -45,6 +61,8 @@ double computeCellMass(particle_t * particles, int length) {
 	}
 
 
-	return (totalX+totalY)/totalMax;
+	//Affect out variable with center mass coordinates
+	*X = totalX / totalMax;
+	*Y = totalY / totalMax;
 }
 
