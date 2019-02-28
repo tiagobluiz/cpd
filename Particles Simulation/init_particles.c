@@ -4,7 +4,7 @@ void init_particles(long seed, long ncside, long long n_part, particle_t *par)
 {
     long long i;
 
-    srand(seed);
+    srandom(seed);
 
     for(i = 0; i < n_part; i++)
     {
