@@ -27,7 +27,7 @@ double computeMagnitudeForce(particle_t* a, cell * b) {
  * @param side              number of cells in each side
  * @param cell_dimension    dimension of each cell
  */
-void getCell(int unbound_row, int unbound_column, cell ** cells, cell * return_cell int side, double cell_dimension){
+void getCell(int unbounded_row, int unbounded_column, cell ** cells, cell * return_cell, int side, double cell_dimension){
     int bounded_row = unbounded_row%side;
     int bounded_column = unbounded_column%side;
 
@@ -98,7 +98,7 @@ void calculateForce(particle_t * particles, int particlesLength, cell ** cells, 
 
         //calculate the resultant force and the respective angle
         forceVector[i].force = sqrt( Fx*Fx + Fy*Fy );
-        forceVector[i].angle = acos(Fx/resultant_force);
+        forceVector[i].angle = acos(Fx/forceVector[i].force);
     }
 }
 

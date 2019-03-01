@@ -13,6 +13,8 @@ typedef struct {
 	double y;
 	double vx;
 	double vy;
+	long long cellX;
+	long long cellY;
 	double m;
 }particle_t;
 
