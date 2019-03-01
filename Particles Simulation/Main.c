@@ -41,36 +41,40 @@ void computeParticlePosition(double * x, double * y, double velocity, double acc
     *y = *y + velocity + 1/2 * acceleration * exp2(delta);
 }
 
-void computeCellMass(particle_t * particles, int length, double * X, double * Y) {
+/**
+ * Computes the center mass for each existing cell in grid
+ *
+ * @param cells array of cells that compose the grid
+ * @param length number of particles (must match @cells length)
+ */
+void computeCellCenterMass(cell * cells, int length) {
+    for (int cellIndex = 0; cellIndex < length; cellIndex++){
+        particle_t * cellParticles = *cells[cellIndex].particles;
 
-    for (int i = 0; i < length; i++){
-        
+        double totalY = 0;
+        double totalX = 0;
+        double totalMax = 0;
+
+
+        for (int i = 0; i < length; i++) totalMax += cellParticles[i].m;                                                // Computes the total mass of the PIC
+
+
+        for (int i = 0; i < length; i++) {                                                                              // Compute the influence of each PIC on center mass
+            totalX += cells[i].m * cells[i].x;
+            totalY += cells[i].m * cells[i].y;
+        }
+
+
+        //Affect out variable with center mass coordinates
+        cells[cellIndex].x = totalX / totalMax;
+        cells[cellIndex].y = totalY / totalMax;
+        cells[cellIndex].m = totalMax;
     }
-
-
-	double totalY = 0;
-	double totalX = 0;
-	double totalMax = 0;
-	
-	for (int i = 0; i < length; i++) {
-		totalMax += particles[i].m;
-	}
-
-
-	for (int i = 0; i < length; i++) {
-		totalX += particles[i].m * particles[i].x;
-		totalY += particles[i].m * particles[i].y;
-	}
-
-
-	//Affect out variable with center mass coordinates
-	*X = totalX / totalMax;
-	*Y = totalY / totalMax;
 }
 
 void createGrid(particle_t * particles, long ncSide){
 	cell ** grid = malloc(ncSide*ncSide* sizeof(cell));
-	
+
 
 }
 
