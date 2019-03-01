@@ -1,5 +1,59 @@
 #include "Header.h"
 
+particle_list * rmvlist( particle_list * list, particle_t * particle){
+    particle_list * curr = list;
+    while(curr->particle != particle && curr != NULL){
+        curr = curr->next;
+    }
+
+    curr->next->prev = curr->prev;
+    curr->prev->next = curr->next;
+
+    return curr;
+}
+
+particle_list * addlist( particle_list * list, particle_t * particle){
+    particle_list *newOne = (particle_list *)malloc(sizeof(particle_list));
+    newOne->particle = particle;
+
+    list->prev = newOne;
+    newOne->next = list;
+
+    return newOne;
+}
+
+
+
+cell ** createGrid(particle_t * particles, long long length, long ncSide){
+    //Allocation of the cells
+    cell ** grid = (cell **)malloc(ncSide*sizeof(cell*));
+    for(int i = 0; i < ncSide; i++)
+        grid[i] = (cell*)malloc(ncSide* sizeof(cell));
+
+    double sizeCell = 1.0/ncSide;
+    printf("CELLS %f \n", sizeCell);
+
+    for(int i = 0; i < length; i++){
+        long cellX = particles[i].x/sizeCell;
+        long cellY = particles[i].y/sizeCell;
+        cell * cell = &grid[cellX][cellY];
+        particle_list *newOne = (particle_list *)malloc(sizeof(particle_list));
+        if(grid[cellX][cellY].particles==NULL){
+            newOne->particle = &particles[i];
+            cell->particles = newOne;
+        }else {
+            cell->particles = addlist(cell->particles, &particles[i]);
+        }
+
+        particles[i].cellX = cellX;
+        particles[i].cellY = cellY;
+
+        printf("True CellX=%ld , True CellY=%ld , partilceX= %f , particleY= %f \n", cellX, cellY, particles[i].x, particles[i].y);
+    }
+
+    return grid;
+}
+
 //1 3 10 1
 int main(int args_length, char* args[]) {
 	if (args_length < 4) {
@@ -24,7 +78,20 @@ int main(int args_length, char* args[]) {
 		printf("X %f , Y %f, VX %f, VY %f, M %f \n",particles[i].x, particles[i].y, particles[i].vx, particles[i].vy, particles[i].m);
 	}
 
+    cell ** cellMatrix = createGrid(particles, n_part, ncside);
 
+    for(int x =0;x<ncside;x++){
+        for(int y =0;y<ncside;y++){
+            printf("IndeX = %d IndeY = %d \n", x, y);
+            particle_list * curr = cellMatrix[x][y].particles;
+            while(curr!=NULL){
+                printf("\tParticle \n \t  X = %lf Y= %lf \n", curr->particle->x, curr->particle->y);
+                curr = curr->next;
+            }
+        }
+    }
+
+    free(cellMatrix);
 	free(particles);
 }
 
@@ -49,7 +116,7 @@ void computeParticlePosition(double * x, double * y, double velocity, double acc
  */
 void computeCellCenterMass(cell * cells, int length) {
     for (int cellIndex = 0; cellIndex < length; cellIndex++){
-        particle_t * cellParticles = *cells[cellIndex].particles;
+        particle_t * cellParticles = cells[cellIndex].particles;
 
         double totalY = 0;
         double totalX = 0;
@@ -72,9 +139,4 @@ void computeCellCenterMass(cell * cells, int length) {
     }
 }
 
-void createGrid(particle_t * particles, long ncSide){
-	cell ** grid = malloc(ncSide*ncSide* sizeof(cell));
-
-
-}
 
