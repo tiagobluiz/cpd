@@ -43,7 +43,7 @@ void getCell(int unbounded_row, int unbounded_column, cell ** cells, cell * retu
     int bounded_row = unbounded_row%side;
     int bounded_column = unbounded_column%side;
 
-    if((unbounded_row >= side && unbounded_column >= side) || unbounded_row < 0 && unbounded_column < 0){
+    if((unbounded_row >= side && unbounded_column >= side) || (unbounded_row < 0 && unbounded_column < 0)){
         return_cell->x = unbounded_column*cell_dimension + cells[bounded_row][bounded_column].x;
         return_cell->y = unbounded_row*cell_dimension + cells[bounded_row][bounded_column].y;
         return_cell->m = cells[bounded_row][bounded_column].m;

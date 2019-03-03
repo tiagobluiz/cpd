@@ -347,4 +347,3 @@ MigrationBackup/
 #CLion
 
 cmake-build-debug/
-CMakeLists.txt

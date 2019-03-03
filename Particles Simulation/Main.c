@@ -111,31 +111,24 @@ void computeParticlePosition(double * x, double * y, double velocity, double acc
 /**
  * Computes the center mass for each existing cell in grid
  *
- * @param cells array of cells that compose the grid
- * @param length number of particles (must match @cells length)
+ * @param particles array of particles that compose the grid
+ * @param length number of particles (must match @particles length)
+ * @param cells bidimensional array with the grid of cells
+ * @param ncside sides of the grid (how many rows the grid has)
  */
-void computeCellCenterMass(cell * cells, int length) {
-    for (int cellIndex = 0; cellIndex < length; cellIndex++){
-        particle_t * cellParticles = cells[cellIndex].particles;
+void computeCellCenterMass(particle_t * particles, long length, cell ** cells, long ncside) {
+    for (long particleIndex = 0; particleIndex < length; particleIndex++){
+        particle_t particle = particles[particleIndex];
+        cells[particle.cellX][particle.cellY].x = particle.m * particle.x;
+        cells[particle.cellX][particle.cellY].y = particle.m * particle.y;
+        cells[particle.cellX][particle.cellY].m += particle.m;
+    }
 
-        double totalY = 0;
-        double totalX = 0;
-        double totalMax = 0;
-
-
-        for (int i = 0; i < length; i++) totalMax += cellParticles[i].m;                                                // Computes the total mass of the PIC
-
-
-        for (int i = 0; i < length; i++) {                                                                              // Compute the influence of each PIC on center mass
-            totalX += cells[i].m * cells[i].x;
-            totalY += cells[i].m * cells[i].y;
+    for (long cellRowIndex = 0; cellRowIndex < ncside; cellRowIndex++){
+        for (long cellColumnIndex = 0; cellColumnIndex < ncside; cellColumnIndex++){
+            cells[cellRowIndex][cellColumnIndex].x /= cells[cellRowIndex][cellColumnIndex].m;
+            cells[cellRowIndex][cellColumnIndex].y /= cells[cellRowIndex][cellColumnIndex].m;
         }
-
-
-        //Affect out variable with center mass coordinates
-        cells[cellIndex].x = totalX / totalMax;
-        cells[cellIndex].y = totalY / totalMax;
-        cells[cellIndex].m = totalMax;
     }
 }
 
