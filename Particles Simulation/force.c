@@ -3,8 +3,8 @@
 
 //struct that represents the force applied to a particle
 typedef struct {
-    double force;       // double which contains the force applied to the particle in N
-    double angle;       //double which contains the angle of the force where the X axis is the base
+    double Fx;       // double which contains the force applied to the particle in N
+    double Fy;       //double which contains the angle of the force where the X axis is the base
 } force_vector;
 
 
@@ -14,6 +14,18 @@ double computeMagnitudeForce(particle_t* a, cell * b) {
     if(distance_a_b < MINIMUM_DISTANCE)
         return 0;
     return G * ( a->m * b->m ) / ( exp2 (distance_a_b));
+}
+
+void updateParticlePosition(particle_t * particle, double Fx, double Fy){
+    double acceleration_x = Fx/particle->m;
+    double acceleration_y = Fy/particle->m;
+    particle->vx += acceleration_x;
+    particle->vy += acceleration_y;
+    particle->x += particle->vx + acceleration_x/2;
+    particle->y += particle->vy + acceleration_y/2;
+
+    //WE CAN UPDATE THE PARTICLE POSITION IN HERE
+
 }
 
 /**
@@ -61,7 +73,7 @@ void getCell(int unbounded_row, int unbounded_column, cell ** cells, cell * retu
  * @param side              number of cells in each side
  * @param cell_dimension    dimension of each cell
  */
-void calculateForce(particle_t * particles, int particlesLength, cell ** cells, force_vector * forceVector, int side, double cell_dimension){
+void calculateForce(particle_t * particles, int particlesLength, cell ** cells, int side, double cell_dimension){
 
     //iterate all cells
     for(int i = 0; i < particlesLength; i++ ){
@@ -89,16 +101,13 @@ void calculateForce(particle_t * particles, int particlesLength, cell ** cells, 
                 //compute force !!!!!!!!!!!!!!!! verificar se é assim
                 double force = computeMagnitudeForce(&particles[i], &neighbor_cell);
 
-                //compute resultant force
-                // it's in radians or degrees????????????
                 Fx += force*cos(vector_angle);
-                Fy += force*((M_PI/2) - vector_angle);
+                Fy += force*sin(vector_angle);
             }
         }
 
-        //calculate the resultant force and the respective angle
-        forceVector[i].force = sqrt( Fx*Fx + Fy*Fy );
-        forceVector[i].angle = acos(Fx/forceVector[i].force);
+        //update the particle position
+        updateParticlePosition(&particles[i], Fx, Fy);
     }
 }
 
