@@ -23,6 +23,7 @@ typedef struct {
 	double x;
 	double y;
 	double m;
+	int part;
 }cell;
 
 void init_particles(long seed, long ncside, long long n_part, particle_t* par);

@@ -22,9 +22,9 @@ void updateParticle(particle_t * particle, long ncSide){
  */
 cell ** createGrid(particle_t * particles, long long length, long ncSide, double * cell_dimension){
     //Allocation of the cells
-    cell ** grid = (cell **)malloc(ncSide*sizeof(cell*));
+    cell ** grid = (cell **) malloc(ncSide * ncSide * sizeof(cell*));
     for(int i = 0; i < ncSide; i++)
-        grid[i] = (cell*)malloc(ncSide* sizeof(cell));
+        grid[i] = (cell*)calloc(ncSide, sizeof(cell)); // review this alloc - TODO
 
     *cell_dimension = 1.0/ncSide;
 
@@ -61,9 +61,10 @@ void computeParticlePosition(double * x, double * y, double velocity, double acc
 void computeCellCenterMass(particle_t * particles, long length, cell ** cells, long ncside) {
     for (long particleIndex = 0; particleIndex < length; particleIndex++){
         particle_t particle = particles[particleIndex];
-        cells[particle.cellX][particle.cellY].x = particle.m * particle.x;
-        cells[particle.cellX][particle.cellY].y = particle.m * particle.y;
+        cells[particle.cellX][particle.cellY].x += particle.m * particle.x;
+        cells[particle.cellX][particle.cellY].y += particle.m * particle.y;
         cells[particle.cellX][particle.cellY].m += particle.m;
+        cells[particle.cellX][particle.cellY].part += 1;
     }
 
     for (long cellRowIndex = 0; cellRowIndex < ncside; cellRowIndex++){
@@ -117,7 +118,7 @@ void updateParticlePosition(particle_t * particle, double Fx, double Fy, long nc
  * position on the opposite side of the space.
  *
  * @param unbound_row       indice in X axis
- * @param unbound_column    indice in Yaxis
+ * @param unbound_column    indice in Y axis
  * @param cells             matrix with the cells to search
  * @param return_cell       cell which we were trying to get
  * @param ncside              number of cells in each side
@@ -162,7 +163,7 @@ cell * getCell(long long unbounded_row, long long unbounded_column, cell ** cell
  * @param ncside            number of cells in each side
  * @param cell_dimension    dimension of each cell
  */
-void calculateForce(particle_t * particles, int particlesLength, cell ** cells, long ncside, double cell_dimension){
+void computeForce(particle_t *particles, int particlesLength, cell **cells, long ncside, double cell_dimension){
 
     //iterate all particles
     for(int i = 0; i < particlesLength; i++ ){
@@ -196,8 +197,6 @@ void calculateForce(particle_t * particles, int particlesLength, cell ** cells, 
 
                 Fx += force * cos(vector_angle);
                 Fy += force * sin(vector_angle);
-
-                int a = 0;
             }
         }
 
@@ -206,9 +205,19 @@ void calculateForce(particle_t * particles, int particlesLength, cell ** cells, 
     }
 }
 
-void overallCenterOfMass(cell ** cells, long ncside){
-
-    printf("%f %f", 1, 1);
+void computeOverallCenterOfMass(cell ** cells, long ncside){
+    cell overallCenterMass;// = {x:0, y:0, m:0};
+    for (long cellRowIndex = 0; cellRowIndex < ncside; cellRowIndex++){
+        for (long cellColumnIndex = 0; cellColumnIndex < ncside; cellColumnIndex++){
+            if(cells[cellRowIndex][cellColumnIndex].m == 0) continue;
+            overallCenterMass.x += cells[cellRowIndex][cellColumnIndex].x * cells[cellRowIndex][cellColumnIndex].m;
+            overallCenterMass.y += cells[cellRowIndex][cellColumnIndex].y * cells[cellRowIndex][cellColumnIndex].m;
+            overallCenterMass.m += cells[cellRowIndex][cellColumnIndex].m;
+        }
+    }
+    overallCenterMass.x /= overallCenterMass.m;
+    overallCenterMass.y /= overallCenterMass.m;
+    printf("%0.2f  %0.2f", overallCenterMass.x, overallCenterMass.y);
 
 }
 
@@ -225,33 +234,22 @@ int main(int args_length, char* args[]) {
     long long n_part = strtol(args[3], NULL, 10);
     long iterations = strtol(args[4], NULL, 10);
 
-    particle_t * particles = malloc(n_part * sizeof(particle_t));
+    particle_t * particles = calloc(n_part, sizeof(particle_t));
 
     init_particles(seed, ncside, n_part, particles);
 
     printf("Seed %ld, Ncside %ld, N_part %lld, Iterations %ld \n", seed, ncside, n_part, iterations);
 
-    for(int i = 0; i < n_part; i++){
-        printf("Index : %d \n", i);
-        printf("CellX %lld , CellY %lld , X %f , Y %f, VX %f, VY %f, M %f \n",particles[i].cellX, particles[i].cellY,particles[i].x, particles[i].y, particles[i].vx, particles[i].vy, particles[i].m);
-    }
-
     double cell_dimension = 0;
     cell ** cellMatrix = createGrid(particles, n_part, ncside, &cell_dimension);
-    printf("\n\n");
-
-    for(int i = 0; i < n_part; i++){
-        printf("Index : %d \n", i);
-        printf("CellX %lld , CellY %lld , X %f , Y %f, VX %f, VY %f, M %f \n",particles[i].cellX, particles[i].cellY,particles[i].x, particles[i].y, particles[i].vx, particles[i].vy, particles[i].m);
-    }
 
     for(int i = 0; i < iterations; i++){
         computeCellCenterMass(particles, n_part, cellMatrix, ncside);
-        calculateForce(particles, n_part, cellMatrix, ncside, cell_dimension);
+        computeForce(particles, n_part, cellMatrix, ncside, cell_dimension);
     }
 
-    printf("X : %f \nY : %f", particles[0].x, particles[0].y);
-
+    printf("%0.2f %0.2f \n", particles[0].x, particles[0].y);
+    computeOverallCenterOfMass(cellMatrix, ncside);
     free(cellMatrix);
     free(particles);
 }
