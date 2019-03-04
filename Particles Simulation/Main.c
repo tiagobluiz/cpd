@@ -1,29 +1,25 @@
 #include "Header.h"
 
-particle_list * rmvlist( particle_list * list, particle_t * particle){
-    particle_list * curr = list;
-    while(curr->particle != particle && curr != NULL){
-        curr = curr->next;
-    }
+/**
+ * Update the matrix coordenates of each particle
+ *
+ * @param particle A pointer to a particle
+ * @param ncSide The number of cells on each side of the matrix of cells
+ */
+void updateParticle(particle_t * particle, long ncSide){
 
-    curr->next->prev = curr->prev;
-    curr->prev->next = curr->next;
+    double sizeCell = 1.0/ncSide;
 
-    return curr;
+    particle->cellX = particle->x/sizeCell;
+    particle->cellY = particle->y/sizeCell;
 }
-
-particle_list * addlist( particle_list * list, particle_t * particle){
-    particle_list *newOne = (particle_list *)malloc(sizeof(particle_list));
-    newOne->particle = particle;
-
-    list->prev = newOne;
-    newOne->next = list;
-
-    return newOne;
-}
-
-
-
+/**
+ *
+ * @param particles Array that contains all the particles
+ * @param length The size of the particles array
+ * @param ncSide The number of cells on each side of the matrix of cells
+ * @return Matrix of cells and update the matrix coordenates of each particle
+ */
 cell ** createGrid(particle_t * particles, long long length, long ncSide){
     //Allocation of the cells
     cell ** grid = (cell **)malloc(ncSide*sizeof(cell*));
@@ -31,24 +27,9 @@ cell ** createGrid(particle_t * particles, long long length, long ncSide){
         grid[i] = (cell*)malloc(ncSide* sizeof(cell));
 
     double sizeCell = 1.0/ncSide;
-    printf("CELLS %f \n", sizeCell);
 
     for(int i = 0; i < length; i++){
-        long cellX = particles[i].x/sizeCell;
-        long cellY = particles[i].y/sizeCell;
-        cell * cell = &grid[cellX][cellY];
-        particle_list *newOne = (particle_list *)malloc(sizeof(particle_list));
-        if(grid[cellX][cellY].particles==NULL){
-            newOne->particle = &particles[i];
-            cell->particles = newOne;
-        }else {
-            cell->particles = addlist(cell->particles, &particles[i]);
-        }
-
-        particles[i].cellX = cellX;
-        particles[i].cellY = cellY;
-
-        printf("True CellX=%ld , True CellY=%ld , partilceX= %f , particleY= %f \n", cellX, cellY, particles[i].x, particles[i].y);
+        updateParticle(&particles[i], ncSide);
     }
 
     return grid;
@@ -56,43 +37,38 @@ cell ** createGrid(particle_t * particles, long long length, long ncSide){
 
 //1 3 10 1
 int main(int args_length, char* args[]) {
-	if (args_length < 4) {
-		printf("Incorrect number of arguments! It should be 4!");
-		return -1;
-	}
+    if (args_length < 4) {
+        printf("Incorrect number of arguments! It should be 4!");
+        return -1;
+    }
 
-	//init
-	long seed = strtol(args[1], NULL, 10);
+    //init
+    long seed = strtol(args[1], NULL, 10);
     long ncside = strtol(args[2], NULL, 10);
-	long long n_part = strtol(args[3], NULL, 10);
-	long iterations = strtol(args[4], NULL, 10);
+    long long n_part = strtol(args[3], NULL, 10);
+    long iterations = strtol(args[4], NULL, 10);
 
-	particle_t * particles = malloc(n_part * sizeof(particle_t));
+    particle_t * particles = malloc(n_part * sizeof(particle_t));
 
-	init_particles(seed, ncside, n_part, particles);
+    init_particles(seed, ncside, n_part, particles);
 
-	printf("Seed %ld, Ncside %ld, N_part %lld, Iterations %ld \n", seed, ncside, n_part, iterations);
+    printf("Seed %ld, Ncside %ld, N_part %lld, Iterations %ld \n", seed, ncside, n_part, iterations);
 
-	for(int i = 0; i < n_part; i++){
-		printf("Index : %d \n", i);
-		printf("X %f , Y %f, VX %f, VY %f, M %f \n",particles[i].x, particles[i].y, particles[i].vx, particles[i].vy, particles[i].m);
-	}
+    for(int i = 0; i < n_part; i++){
+        printf("Index : %d \n", i);
+        printf("CellX %lld , CellY %lld , X %f , Y %f, VX %f, VY %f, M %f \n",particles[i].cellX, particles[i].cellY,particles[i].x, particles[i].y, particles[i].vx, particles[i].vy, particles[i].m);
+    }
 
     cell ** cellMatrix = createGrid(particles, n_part, ncside);
+    printf("\n\n");
 
-    for(int x =0;x<ncside;x++){
-        for(int y =0;y<ncside;y++){
-            printf("IndeX = %d IndeY = %d \n", x, y);
-            particle_list * curr = cellMatrix[x][y].particles;
-            while(curr!=NULL){
-                printf("\tParticle \n \t  X = %lf Y= %lf \n", curr->particle->x, curr->particle->y);
-                curr = curr->next;
-            }
-        }
+    for(int i = 0; i < n_part; i++){
+        printf("Index : %d \n", i);
+        printf("CellX %lld , CellY %lld , X %f , Y %f, VX %f, VY %f, M %f \n",particles[i].cellX, particles[i].cellY,particles[i].x, particles[i].y, particles[i].vx, particles[i].vy, particles[i].m);
     }
 
     free(cellMatrix);
-	free(particles);
+    free(particles);
 }
 
 double computeAcceleration(double force, double mass) {

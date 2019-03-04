@@ -18,17 +18,10 @@ typedef struct {
 	double m;
 }particle_t;
 
-typedef struct particle_list {
-	struct particle_list * prev;
-	struct particle_list * next;
-	particle_t * particle;
-}particle_list;
-
 typedef struct {
 	double x;
 	double y;
 	double m;
-	particle_t * particles;
 }cell;
 
 void init_particles(long seed, long ncside, long long n_part, particle_t* par);
