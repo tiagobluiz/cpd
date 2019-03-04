@@ -99,13 +99,13 @@ double computeAcceleration(double force, double mass) {
 	return force / mass;
 }
 
-double computeVelocity(double currVelocity, double acceleration, double delta){
-    return currVelocity * acceleration * delta;
+double computeVelocity(double currVelocity, double acceleration){
+    return currVelocity * acceleration;
 }
 
-void computeParticlePosition(double * x, double * y, double velocity, double acceleration, double delta){
-    *x = *x + velocity + 1/2 * acceleration * exp2(delta);
-    *y = *y + velocity + 1/2 * acceleration * exp2(delta);
+void computeParticlePosition(double * x, double * y, double velocity, double acceleration){
+    *x = *x + velocity + (1/2) * acceleration;
+    *y = *y + velocity + (1/2) * acceleration;
 }
 
 /**
