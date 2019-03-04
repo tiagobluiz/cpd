@@ -23,7 +23,7 @@ double computeMagnitudeForce(particle_t* a, cell * b) {
  * @param Fx        Force in axis X
  * @param Fy        Force in axis Y
  */
-void updateParticlePosition(particle_t * particle, double Fx, double Fy){
+void updateParticlePosition(particle_t * particle, double Fx, double Fy, long ncside){
     double acceleration_x = Fx/particle->m;
     double acceleration_y = Fy/particle->m;
     particle->vx += acceleration_x;
@@ -31,7 +31,8 @@ void updateParticlePosition(particle_t * particle, double Fx, double Fy){
     particle->x += particle->vx + acceleration_x/2;
     particle->y += particle->vy + acceleration_y/2;
 
-    //WE CAN UPDATE THE PARTICLE POSITION IN HERE
+
+    updateParticle(particle, ncside);
 
 }
 
@@ -44,24 +45,24 @@ void updateParticlePosition(particle_t * particle, double Fx, double Fy){
  * @param unbound_column    indice in Yaxis
  * @param cells             matrix with the cells to search
  * @param return_cell       cell which we were trying to get
- * @param side              number of cells in each side
+ * @param ncside              number of cells in each side
  * @param cell_dimension    dimension of each cell
  */
-cell * getCell(long long unbounded_row, long long unbounded_column, cell ** cells, cell * return_cell, int side, double cell_dimension){
-    long long bounded_row = unbounded_row%side;
-    long long bounded_column = unbounded_column%side;
+cell * getCell(long long unbounded_row, long long unbounded_column, cell ** cells, cell * return_cell, long ncside, double cell_dimension){
+    long long bounded_row = unbounded_row%ncside;
+    long long bounded_column = unbounded_column%ncside;
 
-    if((unbounded_row >= side && unbounded_column >= side) || (unbounded_row < 0 && unbounded_column < 0)){
+    if((unbounded_row >= ncside && unbounded_column >= ncside) || (unbounded_row < 0 && unbounded_column < 0)){
         return_cell->x = unbounded_column*cell_dimension + cells[bounded_row][bounded_column].x;
         return_cell->y = unbounded_row*cell_dimension + cells[bounded_row][bounded_column].y;
         return_cell->m = cells[bounded_row][bounded_column].m;
     }
-    else if(unbounded_row >= side || unbounded_row < 0){
+    else if(unbounded_row >= ncside || unbounded_row < 0){
         return_cell->y = unbounded_row*cell_dimension + cells[bounded_row][bounded_column].y;
         return_cell->x = cells[bounded_row][bounded_column].x;
         return_cell->m = cells[bounded_row][bounded_column].m;
     }
-    else if(unbounded_column >= side || unbounded_column < 0){
+    else if(unbounded_column >= ncside || unbounded_column < 0){
         return_cell->x = unbounded_column*cell_dimension + cells[bounded_row][bounded_column].x;
         return_cell->y = cells[bounded_row][bounded_column].y;
         return_cell->m = cells[bounded_row][bounded_column].m;
@@ -82,7 +83,7 @@ cell * getCell(long long unbounded_row, long long unbounded_column, cell ** cell
  * @param ncside            number of cells in each side
  * @param cell_dimension    dimension of each cell
  */
-void calculateForce(particle_t * particles, int particlesLength, cell ** cells, int ncside, double cell_dimension){
+void calculateForce(particle_t * particles, int particlesLength, cell ** cells, long ncside, double cell_dimension){
 
     //iterate all particles
     for(int i = 0; i < particlesLength; i++ ){
@@ -116,7 +117,7 @@ void calculateForce(particle_t * particles, int particlesLength, cell ** cells, 
         }
 
         //update the particle position
-        updateParticlePosition(&particles[i], Fx, Fy);
+        updateParticlePosition(&particles[i], Fx, Fy, ncside);
     }
 }
 
