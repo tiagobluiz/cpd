@@ -7,6 +7,7 @@
 #define RND0_1 ((double) random() / ((long long)1<<31))
 #define G 6.67408e-11
 #define EPSLON 0.01
+#define MINIMUM_DISTANCE 0.01
 
 typedef struct {
 	double x;
