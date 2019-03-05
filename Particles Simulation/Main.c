@@ -47,8 +47,6 @@ int mod (int dividend, int diviser){
     return result < 0? result + diviser : result;
 }
 
-
-
 double computeAcceleration(double force, double mass) {
 	return force / mass;
 }
@@ -87,8 +85,6 @@ void computeCellCenterMass(particle_t * particles, long length, cell ** cells, l
     }
 }
 
-
-
 /**
  * Compute the magnitude force between a particle and a center mass
  * If the particle and the center of mass are to close, the force should be 0
@@ -116,16 +112,14 @@ void updateParticlePosition(particle_t * particle, double Fx, double Fy, long nc
     double acceleration_y = Fy/particle->m;
     particle->vx += acceleration_x;
     particle->vy += acceleration_y;
-    particle->x += particle->vx + acceleration_x/2;
-    particle->y += particle->vy + acceleration_y/2;
-
-    // TODO FALTA VER SE ISTO FUNCIONA PARA NEGATIVOS
-    particle->x = fmod(particle->x, 1);
-    particle->y = fmod(particle->y, 1);
-
+    double x= particle->x + particle->vx + acceleration_x/2;
+    double y= particle->y + particle->vy + acceleration_y/2;
+    x = fmod(x, MAX_COORDINATES_VALUE);
+    y = fmod(y, MAX_COORDINATES_VALUE);
+    particle->x = x < 0 ? x + MAX_COORDINATES_VALUE : x;
+    particle->y = y < 0 ? y + MAX_COORDINATES_VALUE : y;
 
     updateParticle(particle, ncside);
-
 }
 
 /**

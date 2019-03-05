@@ -8,6 +8,7 @@
 #define G 6.67408e-11
 #define EPSLON 0.01
 #define MINIMUM_DISTANCE 0.01
+#define MAX_COORDINATES_VALUE 1
 
 typedef struct {
 	double x;
