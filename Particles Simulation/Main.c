@@ -43,9 +43,20 @@ int mod (int dividend, int diviser){
  */
 cell ** create_grid(particle_t * particles, long long length, long ncside, double *cell_dimension){
     //Allocation of the cells
-    cell ** grid = (cell **) malloc(ncside * ncside * sizeof(cell*));
+    cell ** grid = (cell **) malloc(sizeof(cell*) * ncside + sizeof(cell) * ncside * ncside);
+//    for(int i = 0; i < ncside; i++)
+//        grid[i] = (cell*)calloc(ncside, sizeof(cell)); // review this alloc - TODO
+
+    cell * ptr = grid + ncside;
     for(int i = 0; i < ncside; i++)
-        grid[i] = (cell*)calloc(ncside, sizeof(cell)); // review this alloc - TODO
+        grid[i] = (ptr + ncside * i);
+
+    for (long cellRowIndex = 0; cellRowIndex < ncside; cellRowIndex++){
+        for (long cellColumnIndex = 0; cellColumnIndex < ncside; cellColumnIndex++){
+            grid[cellRowIndex][cellColumnIndex].x = grid[cellRowIndex][cellColumnIndex].y =
+                    grid[cellRowIndex][cellColumnIndex].m = 0;
+        }
+    }
 
     *cell_dimension = 1.0/ncside;
 
