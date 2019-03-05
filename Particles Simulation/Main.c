@@ -104,7 +104,7 @@ void updateParticlePosition(particle_t * particle, double Fx, double Fy, long nc
     double acceleration_y = Fy/particle->m;
     particle->vx += acceleration_x;
     particle->vy += acceleration_y;
-    particle->x += particle->vx + acceleration_x/2;
+    particle->x += particle->vx + acceleration_x/2; // TODO tem que dar a volta carambas
     particle->y += particle->vy + acceleration_y/2;
 
 
