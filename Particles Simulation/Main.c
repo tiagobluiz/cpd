@@ -35,6 +35,18 @@ cell ** createGrid(particle_t * particles, long long length, long ncSide, double
     return grid;
 }
 
+/**
+ * This function finds the remainder after division of one number by another
+ *
+ * @param dividend  the number that will be divided
+ * @param diviser   the number that divides
+ * @return          the remainder (always positive) of the operation
+ */
+int mod (int dividend, int diviser){
+    int result = dividend % diviser;
+    return result < 0? result + diviser : result;
+}
+
 
 
 double computeAcceleration(double force, double mass) {
@@ -104,8 +116,12 @@ void updateParticlePosition(particle_t * particle, double Fx, double Fy, long nc
     double acceleration_y = Fy/particle->m;
     particle->vx += acceleration_x;
     particle->vy += acceleration_y;
-    particle->x += particle->vx + acceleration_x/2; // TODO tem que dar a volta carambas
+    particle->x += particle->vx + acceleration_x/2;
     particle->y += particle->vy + acceleration_y/2;
+
+    // TODO FALTA VER SE ISTO FUNCIONA PARA NEGATIVOS
+    particle->x = fmod(particle->x, 1);
+    particle->y = fmod(particle->y, 1);
 
 
     updateParticle(particle, ncside);
@@ -121,16 +137,12 @@ void updateParticlePosition(particle_t * particle, double Fx, double Fy, long nc
  * @param unbound_column    indice in Y axis
  * @param cells             matrix with the cells to search
  * @param return_cell       cell which we were trying to get
- * @param ncside              number of cells in each side
+ * @param ncside            number of cells in each side
  * @param cell_dimension    dimension of each cell
  */
 cell * getCell(long long unbounded_row, long long unbounded_column, cell ** cells, cell * return_cell, long ncside, double cell_dimension){
-
-    // somar ncside para resolver
-    long long bounded_column  = unbounded_column == -1 ? ncside - 1 : unbounded_column;
-    long long bounded_row = unbounded_row == -1 ? ncside - 1 : unbounded_row;
-    bounded_row = bounded_row % ncside;
-    bounded_column = bounded_column % ncside;
+    int bounded_row = mod(unbounded_row, ncside);
+    int bounded_column = mod(unbounded_column, ncside);
 
     if((unbounded_row >= ncside && unbounded_column >= ncside) || (unbounded_row < 0 && unbounded_column < 0)){
         return_cell->x = unbounded_column*cell_dimension + cells[bounded_row][bounded_column].x;
@@ -155,7 +167,7 @@ cell * getCell(long long unbounded_row, long long unbounded_column, cell ** cell
 }
 
 /**
- * Function that calculates the force being applied to all particles
+ * Function that computes the force being applied to all particles and updates their cell after being moved
  *
  * @param particles         list with the particles
  * @param particlesLength   number of particles in the list
@@ -163,7 +175,8 @@ cell * getCell(long long unbounded_row, long long unbounded_column, cell ** cell
  * @param ncside            number of cells in each side
  * @param cell_dimension    dimension of each cell
  */
-void computeForce(particle_t *particles, int particlesLength, cell **cells, long ncside, double cell_dimension){
+void computeForceAndUpdateParticles(particle_t *particles, int particlesLength, cell **cells, long ncside,
+                                    double cell_dimension){
 
     //iterate all particles
     for(int i = 0; i < particlesLength; i++ ){
@@ -183,7 +196,7 @@ void computeForce(particle_t *particles, int particlesLength, cell **cells, long
                 cell created_neighbor_cell;
                 cell * neighbor_cell = getCell(row + cell_x, column + cell_y, cells, &created_neighbor_cell, ncside, cell_dimension);
 
-                //if that cell doesn't have any particle, as consequence no central mass will exist, so we ignore
+                //if that cell doesn't have any particle, as a consequence no central mass will exist, so we ignore
                 if(neighbor_cell->m == 0)
                     continue;
 
@@ -245,7 +258,7 @@ int main(int args_length, char* args[]) {
 
     for(int i = 0; i < iterations; i++){
         computeCellCenterMass(particles, n_part, cellMatrix, ncside);
-        computeForce(particles, n_part, cellMatrix, ncside, cell_dimension);
+        computeForceAndUpdateParticles(particles, n_part, cellMatrix, ncside, cell_dimension);
     }
 
     printf("%0.2f %0.2f \n", particles[0].x, particles[0].y);
