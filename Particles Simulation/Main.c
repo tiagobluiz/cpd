@@ -221,15 +221,18 @@ void compute_force_and_update_particles(particle_t *particles, int particles_len
     }
 }
 
-void compute_overall_center_mass(cell ** cells, long ncside){
-    cell overallCenterMass;// = {x:0, y:0, m:0};
-    for (long cellRowIndex = 0; cellRowIndex < ncside; cellRowIndex++){
-        for (long cellColumnIndex = 0; cellColumnIndex < ncside; cellColumnIndex++){
-            if(cells[cellRowIndex][cellColumnIndex].m == 0) continue;
-            overallCenterMass.x += cells[cellRowIndex][cellColumnIndex].x * cells[cellRowIndex][cellColumnIndex].m;
-            overallCenterMass.y += cells[cellRowIndex][cellColumnIndex].y * cells[cellRowIndex][cellColumnIndex].m;
-            overallCenterMass.m += cells[cellRowIndex][cellColumnIndex].m;
-        }
+/**
+ * Computes the center mass for each existing cell in grid
+ *
+ * @param particles array of particles that compose the grid
+ * @param length number of particles (must match @particles length)
+ */
+void compute_overall_center_mass(particle_t * particles, long length){
+    cell overallCenterMass = {x:0, y:0, m:0};
+    for (long particleIndex = 0; particleIndex < length; particleIndex++){
+        overallCenterMass.x += particles[particleIndex].x * particles[particleIndex].m;
+        overallCenterMass.y += particles[particleIndex].y * particles[particleIndex].m;
+        overallCenterMass.m += particles[particleIndex].m;
     }
     overallCenterMass.x /= overallCenterMass.m;
     overallCenterMass.y /= overallCenterMass.m;
@@ -265,7 +268,7 @@ int main(int args_length, char* args[]) {
     }
 
     printf("%0.2f %0.2f \n", particles[0].x, particles[0].y);
-    compute_overall_center_mass(cellMatrix, ncside);
+    compute_overall_center_mass(particles, n_part);
     free(cellMatrix);
     free(particles);
 }
