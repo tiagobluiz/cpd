@@ -2,14 +2,14 @@
 
 
 /**
- * Utilitary Methods
+ * Utility Methods
  */
 
 /**
- * Update the matrix coordenates of each particle
+ * Update the matrix coordinates of each particle
  *
- * @param particle A pointer to a particle
- * @param ncside The number of cells on each side of the matrix of cells
+ * @param particle  A pointer to a particle
+ * @param ncside    The number of cells on each side of the matrix of cells
  */
 void update_particle(particle_t *particle, long ncside){
     double sizeCell = 1.0/ncside;
@@ -30,6 +30,20 @@ int mod (int dividend, int diviser){
 }
 
 /**
+ * Cleans all cells and resets all parameters to 0 so that the previous state doesn't affect the new one
+ * @param cells     bidimensional array with the grid of cells
+ * @param ncside    sides of the grid (how many rows the grid has)
+ */
+void clean_cells(cell ** cells, long ncside){
+    for (long cellRowIndex = 0; cellRowIndex < ncside; cellRowIndex++){
+        for (long cellColumnIndex = 0; cellColumnIndex < ncside; cellColumnIndex++){
+            cells[cellRowIndex][cellColumnIndex].x = cells[cellRowIndex][cellColumnIndex].y =
+            cells[cellRowIndex][cellColumnIndex].m = cells[cellRowIndex][cellColumnIndex].part = 0;
+        }
+    }
+}
+
+/**
  * Implementation
  */
 
@@ -37,8 +51,8 @@ int mod (int dividend, int diviser){
 /**
  *
  * @param particles Array that contains all the particles
- * @param length The size of the particles array
- * @param ncside The number of cells on each side of the matrix of cells
+ * @param length    The size of the particles array
+ * @param ncside    The number of cells on each side of the matrix of cells
  * @return Matrix of cells and update the matrix coordenates of each particle
  */
 cell ** create_grid(particle_t * particles, long long length, long ncside, double *cell_dimension){
@@ -84,6 +98,7 @@ void compute_cell_center_mass(particle_t *particles, long length, cell ** cells,
         cells[particle.cellX][particle.cellY].part += 1;
     }
 
+    //#pragma omp parallel for
     for (long cellRowIndex = 0; cellRowIndex < ncside; cellRowIndex++){
         for (long cellColumnIndex = 0; cellColumnIndex < ncside; cellColumnIndex++){
             cells[cellRowIndex][cellColumnIndex].x /= cells[cellRowIndex][cellColumnIndex].m;
@@ -224,8 +239,8 @@ void compute_force_and_update_particles(particle_t *particles, int particles_len
 /**
  * Computes the center mass for each existing cell in grid
  *
- * @param particles array of particles that compose the grid
- * @param length number of particles (must match @particles length)
+ * @param particles     array of particles that compose the grid
+ * @param length        number of particles (must match @particles length)
  */
 void compute_overall_center_mass(particle_t * particles, long length){
     cell overallCenterMass = {x:0, y:0, m:0};
@@ -265,6 +280,7 @@ int main(int args_length, char* args[]) {
     for(int i = 0; i < iterations; i++){
         compute_cell_center_mass(particles, n_part, cellMatrix, ncside);
         compute_force_and_update_particles(particles, n_part, cellMatrix, ncside, cell_dimension);
+        clean_cells(cellMatrix, ncside);
     }
 
     printf("%0.2f %0.2f \n", particles[0].x, particles[0].y);
