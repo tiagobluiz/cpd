@@ -1,5 +1,5 @@
 #include "Header.h"
-
+//#include <omp.h>
 
 /**
  * Utility Methods
@@ -85,11 +85,35 @@ cell ** create_grid(particle_t * particles, long long length, long ncside, doubl
  * Computes the center mass for each existing cell in grid
  *
  * @param particles array of particles that compose the grid
- * @param length number of particles (must match @particles length)
- * @param cells bidimensional array with the grid of cells
- * @param ncside sides of the grid (how many rows the grid has)
+ * @param length    number of particles (must match @particles length)
+ * @param cells     bidimensional array with the grid of cells
+ * @param ncside    sides of the grid (how many rows the grid has)
  */
 void compute_cell_center_mass(particle_t *particles, long length, cell ** cells, long ncside) {
+
+  /*  #pragma omp parallel{
+    /**
+     * criar um array por thread, e cada um ter o seu. O array teria o length de ncside + ncside
+     * dado que cada thread teria o seu array, a posição da celula a ser afetada seria dada pela soma do cellX + cellY
+     * no final um outro for juntaria essas threads
+     *//*
+//        cell ** temporaryCells[#NUM_THREADS][ncside + ncside];
+        #pragma omp for{
+            for (long particleIndex = 0; particleIndex < length; particleIndex++) {
+                particle_t particle = particles[particleIndex];
+                cells[omp_get_thread_num()][particle.cellX + particle.cellY].x += particle.m * particle.x;
+                cells[omp_get_thread_num()][particle.cellX + particle.cellY].y += particle.m * particle.y;
+                cells[omp_get_thread_num()][particle.cellX + particle.cellY].m += particle.m;
+                cells[omp_get_thread_num()][particle.cellX + particle.cellY].part += 1;
+            }
+        }
+        #pragma omp for{
+            for (int threadUsed = 0; threadUsed < #NUM_THREADS; threadUsed++){
+                //ir buscar a cada array e juntar no final a cells
+            }
+        }
+    };*/
+
     for (long particleIndex = 0; particleIndex < length; particleIndex++){
         particle_t particle = particles[particleIndex];
         cells[particle.cellX][particle.cellY].x += particle.m * particle.x;
