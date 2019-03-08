@@ -275,7 +275,7 @@ void compute_overall_center_mass(particle_t * particles, long length){
     }
     overallCenterMass.x /= overallCenterMass.m;
     overallCenterMass.y /= overallCenterMass.m;
-    printf("%0.2f  %0.2f", overallCenterMass.x, overallCenterMass.y);
+    printf("%0.2f %0.2f \n", overallCenterMass.x, overallCenterMass.y);
 
 }
 
@@ -295,8 +295,6 @@ int main(int args_length, char* args[]) {
     particle_t * particles = calloc(n_part, sizeof(particle_t));
 
     init_particles(seed, ncside, n_part, particles);
-
-    printf("Seed %ld, Ncside %ld, N_part %lld, Iterations %ld \n", seed, ncside, n_part, iterations);
 
     double cell_dimension = 0;
     cell ** cellMatrix = create_grid(particles, n_part, ncside, &cell_dimension);
