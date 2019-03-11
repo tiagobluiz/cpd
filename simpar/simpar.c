@@ -8,7 +8,7 @@
 #define G 6.67408e-11
 #define EPSLON 0.01
 #define MINIMUM_DISTANCE 0.01
-#define MAX_COORDINATES_VALUE 1
+#define MAX_COORDINATES_VALUE 1.0
 
 typedef struct {
     double x;
@@ -57,7 +57,7 @@ void init_particles(long seed, long ncside, long long n_part, particle_t *par)
  * @param ncside    The number of cells on each side of the matrix of cells
  */
 void update_particle(particle_t *particle, long ncside){
-    double sizeCell = 1.0/ncside;
+    double sizeCell = MAX_COORDINATES_VALUE/ncside;
     particle->cellX = particle->x/sizeCell;
     particle->cellY = particle->y/sizeCell;
 }
@@ -103,21 +103,12 @@ void clean_cells(cell ** cells, long ncside){
 cell ** create_grid(particle_t * particles, long long length, long ncside, double *cell_dimension){
     //Allocation of the cells
     cell ** grid = (cell **) malloc(sizeof(cell*) * ncside + sizeof(cell) * ncside * ncside);
-//    for(int i = 0; i < ncside; i++)
-//        grid[i] = (cell*)calloc(ncside, sizeof(cell)); // review this alloc - TODO
 
     cell * ptr = grid + ncside;
     for(int i = 0; i < ncside; i++)
         grid[i] = (ptr + ncside * i);
 
-    for (long cellRowIndex = 0; cellRowIndex < ncside; cellRowIndex++){
-        for (long cellColumnIndex = 0; cellColumnIndex < ncside; cellColumnIndex++){
-            grid[cellRowIndex][cellColumnIndex].x = grid[cellRowIndex][cellColumnIndex].y =
-                    grid[cellRowIndex][cellColumnIndex].m = 0;
-        }
-    }
-
-    *cell_dimension = 1.0/ncside;
+    *cell_dimension = MAX_COORDINATES_VALUE/ncside;
 
     for(int i = 0; i < length; i++){
         update_particle(&particles[i], ncside);
