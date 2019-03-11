@@ -264,7 +264,9 @@ cell * get_cell(long long unbounded_row, long long unbounded_column, cell **cell
 void compute_force_and_update_particles(particle_t *particles, int particles_length, cell **cells, long ncside,
                                         double cell_dimension){
 
-    //iterate all particles
+
+    //iterate all particles in parallel
+    #pragma omp parallel for
     for(int i = 0; i < particles_length; i++ ){
 
         //get the coordinates of the cell where the particle is located
