@@ -6,8 +6,6 @@ set(CMAKE_C_STANDARD 11)
 include_directories(.)
 
 add_executable(Particles_Simulation
-        Header.h
-        init_particles.c
-        Main.c)
+        simpar.c)
 
 target_link_libraries(Particles_Simulation m)
