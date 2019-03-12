@@ -136,44 +136,35 @@ cell ** create_grid(particle_t * particles, long long length, long ncside, doubl
  */
 void compute_cell_center_mass(particle_t *particles, long length, cell ** cells, long ncside) {
 
-  /*  #pragma omp parallel{
-    /**
-     * criar um array por thread, e cada um ter o seu. O array teria o length de ncside + ncside
-     * dado que cada thread teria o seu array, a posição da celula a ser afetada seria dada pela soma do cellX + cellY
-     * no final um outro for juntaria essas threads
-     *//*
-//        cell ** temporaryCells[#NUM_THREADS][ncside + ncside];
+    #pragma omp parallel{
+        /*
+         * Using atomic operations we avoid the problem that a thread is writing to the same cell, however other threads
+         * writing to different cells can continue their jobs, and thus decreasing runtime.
+         */
         #pragma omp for{
             for (long particleIndex = 0; particleIndex < length; particleIndex++) {
                 particle_t particle = particles[particleIndex];
-                cells[omp_get_thread_num()][particle.cellX + particle.cellY].x += particle.m * particle.x;
-                cells[omp_get_thread_num()][particle.cellX + particle.cellY].y += particle.m * particle.y;
-                cells[omp_get_thread_num()][particle.cellX + particle.cellY].m += particle.m;
-                cells[omp_get_thread_num()][particle.cellX + particle.cellY].part += 1;
+                #pragma omp atomic
+                cells[particle.cellX][particle.cellY].x = particle.m * particle.x;
+                #pragma omp atomic
+                cells[particle.cellX][particle.cellY].y += particle.m * particle.y;
+                #pragma omp atomic
+                cells[particle.cellX][particle.cellY].m += particle.m;
+                #pragma omp atomic
+                cells[particle.cellX][particle.cellY].part += 1;
             }
         }
-        #pragma omp for{
-            for (int threadUsed = 0; threadUsed < #NUM_THREADS; threadUsed++){
-                //ir buscar a cada array e juntar no final a cells
+
+        long cellColumnIndex;
+        #pragma omp for private(cellColumnIndex){                                   // Each thread is responsible for a row
+            for (long cellRowIndex = 0; cellRowIndex < ncside; cellRowIndex++){
+                for (cellColumnIndex = 0; cellColumnIndex < ncside; cellColumnIndex++){
+                    cells[cellRowIndex][cellColumnIndex].x /= cells[cellRowIndex][cellColumnIndex].m;
+                    cells[cellRowIndex][cellColumnIndex].y /= cells[cellRowIndex][cellColumnIndex].m;
+                }
             }
         }
-    };*/
-
-    for (long particleIndex = 0; particleIndex < length; particleIndex++){
-        particle_t particle = particles[particleIndex];
-        cells[particle.cellX][particle.cellY].x += particle.m * particle.x;
-        cells[particle.cellX][particle.cellY].y += particle.m * particle.y;
-        cells[particle.cellX][particle.cellY].m += particle.m;
-        cells[particle.cellX][particle.cellY].part += 1;
-    }
-
-    //#pragma omp parallel for
-    for (long cellRowIndex = 0; cellRowIndex < ncside; cellRowIndex++){
-        for (long cellColumnIndex = 0; cellColumnIndex < ncside; cellColumnIndex++){
-            cells[cellRowIndex][cellColumnIndex].x /= cells[cellRowIndex][cellColumnIndex].m;
-            cells[cellRowIndex][cellColumnIndex].y /= cells[cellRowIndex][cellColumnIndex].m;
-        }
-    }
+    };
 }
 
 /**
