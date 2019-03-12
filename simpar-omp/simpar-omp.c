@@ -7,7 +7,6 @@
 #define RND0_1 ((double) random() / ((long long)1<<31))
 #define G 6.67408e-11
 #define EPSLON 0.01
-#define MINIMUM_DISTANCE 0.01
 #define MAX_COORDINATES_VALUE 1
 
 typedef struct {
@@ -169,7 +168,7 @@ void compute_cell_center_mass(particle_t *particles, long length, cell ** cells,
  */
 double compute_magnitude_force(particle_t * a, cell * b) {
     double distance_a_b = sqrt ( exp2 ( a->x - b->x ) + exp2 ( a->y - b->y ));
-    if(distance_a_b < MINIMUM_DISTANCE)
+    if(distance_a_b < EPSLON)
         return 0;
     return G * ( a->m * b->m ) / ( exp2 (distance_a_b));
 }
@@ -198,15 +197,16 @@ void update_particle_position(particle_t * particle, double Fx, double Fy, long 
 
 /**
  * Function that gets the cell with the coordinates (unbound_row, unbound_column). Those coordinates will always represent
- * a cell because the space is wrapped, that is, if a particle exits through the side of the space it enters on the corresponding
- * position on the opposite side of the space.
+ * a cell because the space is wrapped, that is, if a particle exits through one side of the space, it enters on the corresponding
+ * opposite side of the space.
  *
- * @param unbound_row       indice in X axis
- * @param unbound_column    indice in Y axis
+ * @param unbound_row       indice unbounded in X axis
+ * @param unbound_column    indice unbounded in Y axis
  * @param cells             matrix with the cells to search
- * @param return_cell       cell which we were trying to get
+ * @param return_cell       cell used to represent the unbounded cell
  * @param ncside            number of cells in each side
  * @param cell_dimension    dimension of each cell
+ * @return                  the neighbor cell
  */
 cell * get_cell(long long unbounded_row, long long unbounded_column, cell **cells, cell * return_cell, long ncside,
                 double cell_dimension){
@@ -239,7 +239,7 @@ cell * get_cell(long long unbounded_row, long long unbounded_column, cell **cell
  * Function that computes the force being applied to all particles and updates their cell after being moved
  *
  * @param particles         list with the particles
- * @param particles_length   number of particles in the list
+ * @param particles_length  number of particles in the list
  * @param cells             matrix that represents the cells
  * @param ncside            number of cells in each side
  * @param cell_dimension    dimension of each cell
@@ -268,7 +268,7 @@ void compute_force_and_update_particles(particle_t *particles, int particles_len
                 cell * neighbor_cell = get_cell(row + cell_x, column + cell_y, cells, &created_neighbor_cell, ncside,
                                                 cell_dimension);
 
-                //if that cell doesn't have any particle, as a consequence no central mass will exist, so we ignore
+                //if that cell doesn't have any particle, no central mass will exist, so we ignore
                 if(neighbor_cell->m == 0)
                     continue;
 
@@ -279,7 +279,6 @@ void compute_force_and_update_particles(particle_t *particles, int particles_len
 
                 //compute force
                 double force = compute_magnitude_force(&particles[i], neighbor_cell);
-
                 Fx += force * cos(vector_angle);
                 Fy += force * sin(vector_angle);
             }
@@ -306,17 +305,14 @@ void compute_overall_center_mass(particle_t * particles, long length){
     overallCenterMass.x /= overallCenterMass.m;
     overallCenterMass.y /= overallCenterMass.m;
     printf("%0.2f %0.2f \n", overallCenterMass.x, overallCenterMass.y);
-
 }
 
-//1 3 10 1
 int main(int args_length, char* args[]) {
     if (args_length < 4) {
         printf("Incorrect number of arguments! It should be 4!");
         return -1;
     }
 
-    //init
     long seed = strtol(args[1], NULL, 10);
     long ncside = strtol(args[2], NULL, 10);
     long long n_part = strtol(args[3], NULL, 10);
