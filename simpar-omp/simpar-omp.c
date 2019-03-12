@@ -23,7 +23,6 @@ typedef struct {
     double x;
     double y;
     double m;
-    int part;
 }cell;
 
 void init_particles(long seed, long ncside, long long n_part, particle_t *par)
@@ -84,7 +83,7 @@ void clean_cells(cell ** cells, long ncside){
     for (long cellRowIndex = 0; cellRowIndex < ncside; cellRowIndex++){
         for (cellColumnIndex = 0; cellColumnIndex < ncside; cellColumnIndex++){
             cells[cellRowIndex][cellColumnIndex].x = cells[cellRowIndex][cellColumnIndex].y =
-            cells[cellRowIndex][cellColumnIndex].m = cells[cellRowIndex][cellColumnIndex].part = 0;
+            cells[cellRowIndex][cellColumnIndex].m = 0;
         }
     }
 }
@@ -142,8 +141,6 @@ void compute_cell_center_mass(particle_t *particles, long length, cell ** cells,
             cells[particle.cellX][particle.cellY].y += particle.m * particle.y;
             #pragma omp atomic
             cells[particle.cellX][particle.cellY].m += particle.m;
-            #pragma omp atomic
-            cells[particle.cellX][particle.cellY].part += 1;
         }
 
         long cellColumnIndex;
@@ -336,10 +333,3 @@ int main(int args_length, char* args[]) {
     free(cellMatrix);
     free(particles);
 }
-
-
-
-
-
-
-
