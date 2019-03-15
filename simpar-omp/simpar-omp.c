@@ -168,11 +168,11 @@ cell ** reduceCellsMatrix (cell ** a, cell ** b){
 }
 
 cell** initMatrix(void * a){
-     cell ** grid = (cell **) malloc(sizeof(cell*) * 3 + sizeof(cell) * 3 * 3);
+     cell ** grid = (cell **) malloc(sizeof(cell*) * 3 + sizeof(cell) * 30 * 30);
 
-    cell * ptr = grid + 3;
-    for(int i = 0; i < 3; i++)
-        grid[i] = (ptr + 3 * i);
+    cell * ptr = grid + 30;
+    for(int i = 0; i < 30; i++)
+        grid[i] = (ptr + 30 * i);
 
     return grid;
 }

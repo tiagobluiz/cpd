@@ -153,23 +153,18 @@ cell * reduceCellsMatrix (cell * a, cell * b){
             a[cellIndex].y += b[cellIndex].y;
             a[cellIndex].y += b[cellIndex].m;
     }
+    //free(b);
     return a;
-}
-
-cell* initMatrix(void * a){
-    cell * grid_1d = (cell*) malloc(sizeof(cell) * 30 * 30);
-
-    return grid_1d;
 }
 
 void compute_cell_center_mass(particle_t *particles, long length, cell * cells, long ncside) {
     #pragma omp declare reduction \
         (redcell:cell*:omp_out=reduceCellsMatrix(omp_out,omp_in)) \
-        initializer(omp_priv=initMatrix(omp_priv))
+        initializer(omp_priv=(cell*) malloc(sizeof(cell) * 30 * 30))
 
     /*
-    * This implementation creates a matrix for each thread. After that, we reduce those matrices into @cells
-    */
+    * This implementation creates an array for each thread. After that, we reduce those matrices into @cells
+    */ 
     #pragma omp parallel
     {   
         #pragma omp for reduction(redcell:cells)
