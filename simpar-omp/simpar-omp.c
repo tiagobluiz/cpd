@@ -110,6 +110,7 @@ cell ** create_grid(particle_t * particles, long long length, long ncside, doubl
 
     *cell_dimension = MAX_COORDINATES_VALUE/ncside;
 
+    #pragma omp parallel for
     for(int i = 0; i < length; i++){
         update_particle(&particles[i], ncside);
     }
@@ -131,7 +132,7 @@ void compute_cell_center_mass(particle_t *particles, long length, cell ** cells,
     * writing to different cells can continue their jobs, and thus decreasing runtime.
     */
     #pragma omp parallel
-    {
+    {   
         #pragma omp for
         for (long particleIndex = 0; particleIndex < length; particleIndex++) {
             particle_t particle = particles[particleIndex];
@@ -141,6 +142,42 @@ void compute_cell_center_mass(particle_t *particles, long length, cell ** cells,
             cells[particle.cellX][particle.cellY].y += particle.m * particle.y;
             #pragma omp atomic
             cells[particle.cellX][particle.cellY].m += particle.m;
+        }
+
+        long cellColumnIndex;
+        #pragma omp for private(cellColumnIndex)                                   // Each thread is responsible for a row
+        for (long cellRowIndex = 0; cellRowIndex < ncside; cellRowIndex++){
+            for (cellColumnIndex = 0; cellColumnIndex < ncside; cellColumnIndex++){
+                cells[cellRowIndex][cellColumnIndex].x /= cells[cellRowIndex][cellColumnIndex].m;
+                cells[cellRowIndex][cellColumnIndex].y /= cells[cellRowIndex][cellColumnIndex].m;
+            }
+        }
+        
+    };
+}
+
+void compute_cell_center_mass_2(particle_t *particles, long length, cell ** cells, long ncside) {
+    /*
+    * This implementation creates a matrix for each thread. After that, we reduce those matrices into @cells
+    */
+    #pragma omp parallel
+    {   
+        int n_threads = imp_get_num_threads();
+        cell * threadCellsMatrices [n_threads];
+        for (int i = 0; i < n_threads; i++){
+            cell ** threadMatrix[ncside][ncside]; // /!/ may need to malloc (verify) - note: this goes to the heap, however the array can be valid only on the scope of this for /!/
+            threadCellsMatrices[i] = threadMatrix;
+        }
+
+        #pragma omp for
+        for (long particleIndex = 0; particleIndex < length; particleIndex++) {
+            particle_t particle = particles[particleIndex];
+
+//fazer algo deste génro (3D ARRAY) - mas com sintaxe correta
+
+          //  threadCellsMatrices[omp_get_thread_num()][particle.cellX][particle.cellY].x += particle.m * particle.x;
+            //threadCellsMatrices[omp_get_thread_num()][particle.cellX][particle.cellY].y += particle.m * particle.y;
+            //threadCellsMatrices[omp_get_thread_num()][particle.cellX][particle.cellY].m += particle.m;
         }
 
         long cellColumnIndex;
