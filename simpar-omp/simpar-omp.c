@@ -126,7 +126,7 @@ cell ** create_grid(particle_t * particles, long long length, long ncside, doubl
  * @param cells     bidimensional array with the grid of cells
  * @param ncside    sides of the grid (how many rows the grid has)
  */
-void compute_cell_center_mass(particle_t *particles, long length, cell ** cells, long ncside) {
+void compute_cell_center_mass_2(particle_t *particles, long length, cell ** cells, long ncside) {
     /*
     * Using atomic operations we avoid the problem that a thread is writing to the same cell, however other threads
     * writing to different cells can continue their jobs, and thus decreasing runtime.
@@ -156,34 +156,52 @@ void compute_cell_center_mass(particle_t *particles, long length, cell ** cells,
     };
 }
 
-void compute_cell_center_mass_2(particle_t *particles, long length, cell ** cells, long ncside) {
+cell ** reduceCellsMatrix (cell ** a, cell ** b){
+    for (long cellRowIndex = 0; cellRowIndex < 3; cellRowIndex++){
+        for (long cellColumnIndex = 0; cellColumnIndex < 3; cellColumnIndex++){
+            a[cellRowIndex][cellColumnIndex].x += b[cellRowIndex][cellColumnIndex].x;
+            a[cellRowIndex][cellColumnIndex].y += b[cellRowIndex][cellColumnIndex].y;
+            a[cellRowIndex][cellColumnIndex].m += b[cellRowIndex][cellColumnIndex].m;
+        }
+    }
+    return a;
+}
+
+cell** initMatrix(void * a){
+     cell ** grid = (cell **) malloc(sizeof(cell*) * 3 + sizeof(cell) * 3 * 3);
+
+    cell * ptr = grid + 3;
+    for(int i = 0; i < 3; i++)
+        grid[i] = (ptr + 3 * i);
+
+    return grid;
+}
+
+void compute_cell_center_mass(particle_t *particles, long length, cell ** cells, long ncside) {
+
+    cell ** acummCell[ncside][ncside];
+
+    #pragma omp declare reduction \
+        (redcell:cell**:omp_out=reduceCellsMatrix(omp_out,omp_in)) \
+        initializer(omp_priv=initMatrix(omp_priv))
+
+
     /*
     * This implementation creates a matrix for each thread. After that, we reduce those matrices into @cells
     */
     #pragma omp parallel
     {   
-        int n_threads = imp_get_num_threads();
-        cell * threadCellsMatrices [n_threads];
-        for (int i = 0; i < n_threads; i++){
-            cell ** threadMatrix[ncside][ncside]; // /!/ may need to malloc (verify) - note: this goes to the heap, however the array can be valid only on the scope of this for /!/
-            threadCellsMatrices[i] = threadMatrix;
-        }
-
-        #pragma omp for
+        #pragma omp for reduction(redcell:cells)
         for (long particleIndex = 0; particleIndex < length; particleIndex++) {
             particle_t particle = particles[particleIndex];
-
-//fazer algo deste génro (3D ARRAY) - mas com sintaxe correta
-
-          //  threadCellsMatrices[omp_get_thread_num()][particle.cellX][particle.cellY].x += particle.m * particle.x;
-            //threadCellsMatrices[omp_get_thread_num()][particle.cellX][particle.cellY].y += particle.m * particle.y;
-            //threadCellsMatrices[omp_get_thread_num()][particle.cellX][particle.cellY].m += particle.m;
+            cells[particle.cellX][particle.cellY].x += particle.m * particle.x;
+            cells[particle.cellX][particle.cellY].y += particle.m * particle.y;
+            cells[particle.cellX][particle.cellY].m += particle.m;
         }
 
-        long cellColumnIndex;
-        #pragma omp for private(cellColumnIndex)                                   // Each thread is responsible for a row
+        #pragma omp for                                    // Each thread is responsible for a row
         for (long cellRowIndex = 0; cellRowIndex < ncside; cellRowIndex++){
-            for (cellColumnIndex = 0; cellColumnIndex < ncside; cellColumnIndex++){
+            for (long cellColumnIndex = 0; cellColumnIndex < ncside; cellColumnIndex++){
                 cells[cellRowIndex][cellColumnIndex].x /= cells[cellRowIndex][cellColumnIndex].m;
                 cells[cellRowIndex][cellColumnIndex].y /= cells[cellRowIndex][cellColumnIndex].m;
             }
