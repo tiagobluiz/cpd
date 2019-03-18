@@ -25,6 +25,27 @@ typedef struct {
     double m;
 }cell;
 
+long NCSIDE = 0;
+
+cell * reduceCellsMatrix (cell * a, cell * b){
+    for (long cellIndex = 0; cellIndex < NCSIDE; cellIndex++){  //TODO: ncside must be dynamic!!
+            a[cellIndex].x += b[cellIndex].x;
+            a[cellIndex].y += b[cellIndex].y;
+            a[cellIndex].y += b[cellIndex].m;
+    }
+    free(b);
+    return a;
+}
+
+cell * initMatrix(void * none){
+    return (cell*) malloc(sizeof(cell) * NCSIDE * NCSIDE);
+}
+
+#pragma omp declare reduction \
+    (redcell:cell*:omp_out=reduceCellsMatrix(omp_out,omp_in)) \
+    initializer(omp_priv=initMatrix(omp_priv))
+
+
 void init_particles(long seed, long ncside, long long n_part, particle_t *par)
 {
     long long i;
@@ -147,20 +168,7 @@ void compute_cell_center_mass_2(particle_t *particles, long length, cell * cells
     };
 }
 
-cell * reduceCellsMatrix (cell * a, cell * b){
-    for (long cellIndex = 0; cellIndex < 30; cellIndex++){  //TODO: ncside must be dynamic!!
-            a[cellIndex].x += b[cellIndex].x;
-            a[cellIndex].y += b[cellIndex].y;
-            a[cellIndex].y += b[cellIndex].m;
-    }
-    //free(b);
-    return a;
-}
-
 void compute_cell_center_mass(particle_t *particles, long length, cell * cells, long ncside) {
-    #pragma omp declare reduction \
-        (redcell:cell*:omp_out=reduceCellsMatrix(omp_out,omp_in)) \
-        initializer(omp_priv=(cell*) malloc(sizeof(cell) * 30 * 30))
 
     /*
     * This implementation creates an array for each thread. After that, we reduce those matrices into @cells
@@ -325,6 +333,7 @@ void compute_force_and_update_particles(particle_t *particles, int particles_len
  */
 void compute_overall_center_mass(particle_t * particles, long length){
     cell overallCenterMass = {x:0, y:0, m:0};
+    #pragma omp parallel for
     for (long particleIndex = 0; particleIndex < length; particleIndex++){
         overallCenterMass.x += particles[particleIndex].x * particles[particleIndex].m;
         overallCenterMass.y += particles[particleIndex].y * particles[particleIndex].m;
@@ -342,21 +351,21 @@ int main(int args_length, char* args[]) {
     }
 
     long seed = strtol(args[1], NULL, 10);
-    long ncside = strtol(args[2], NULL, 10);
+    NCSIDE = strtol(args[2], NULL, 10);
     long long n_part = strtol(args[3], NULL, 10);
     long iterations = strtol(args[4], NULL, 10);
 
     particle_t * particles = calloc(n_part, sizeof(particle_t));
 
-    init_particles(seed, ncside, n_part, particles);
+    init_particles(seed, NCSIDE, n_part, particles);
 
     double cell_dimension = 0;
-    cell ** cellMatrix = create_grid(particles, n_part, ncside, &cell_dimension);
+    cell ** cellMatrix = create_grid(particles, n_part, NCSIDE, &cell_dimension);
 
     for(int i = 0; i < iterations; i++){
-        compute_cell_center_mass(particles, n_part, cellMatrix, ncside);
-        compute_force_and_update_particles(particles, n_part, cellMatrix, ncside, cell_dimension);
-        clean_cells(cellMatrix, ncside);
+        compute_cell_center_mass(particles, n_part, cellMatrix, NCSIDE);
+        compute_force_and_update_particles(particles, n_part, cellMatrix, NCSIDE, cell_dimension);
+        clean_cells(cellMatrix, NCSIDE);
     }
 
     printf("%0.2f %0.2f \n", particles[0].x, particles[0].y);
