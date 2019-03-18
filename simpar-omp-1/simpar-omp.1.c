@@ -7,7 +7,7 @@
 #define RND0_1 ((double) random() / ((long long)1<<31))
 #define G 6.67408e-11
 #define EPSLON 0.01
-#define MAX_COORDINATES_VALUE 1
+#define MAX_COORDINATES_VALUE 1.0
 
 typedef struct {
     double x;
