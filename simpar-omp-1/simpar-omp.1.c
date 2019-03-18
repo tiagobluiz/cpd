@@ -333,7 +333,6 @@ void compute_force_and_update_particles(particle_t *particles, int particles_len
  */
 void compute_overall_center_mass(particle_t * particles, long length){
     cell overallCenterMass = {x:0, y:0, m:0};
-    #pragma omp parallel for
     for (long particleIndex = 0; particleIndex < length; particleIndex++){
         overallCenterMass.x += particles[particleIndex].x * particles[particleIndex].m;
         overallCenterMass.y += particles[particleIndex].y * particles[particleIndex].m;
@@ -361,7 +360,7 @@ int main(int args_length, char* args[]) {
 
     double cell_dimension = 0;
     cell ** cellMatrix = create_grid(particles, n_part, NCSIDE, &cell_dimension);
-
+    clean_cells(cellMatrix, NCSIDE);
     for(int i = 0; i < iterations; i++){
         compute_cell_center_mass(particles, n_part, cellMatrix, NCSIDE);
         compute_force_and_update_particles(particles, n_part, cellMatrix, NCSIDE, cell_dimension);
