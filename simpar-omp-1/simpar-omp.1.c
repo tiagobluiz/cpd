@@ -25,26 +25,12 @@ typedef struct {
     double m;
 }cell;
 
-long NCSIDE = 0;
+long NCSIDE = 0;            // This variable is global so that we can use it on the reduction functions
 
-cell * reduceCellsMatrix (cell * a, cell * b){
-    for (long cellIndex = 0; cellIndex < NCSIDE; cellIndex++){  //TODO: ncside must be dynamic!!
-            a[cellIndex].x += b[cellIndex].x;
-            a[cellIndex].y += b[cellIndex].y;
-            a[cellIndex].y += b[cellIndex].m;
-    }
-    free(b);
-    return a;
-}
 
-cell * initMatrix(void * none){
-    return (cell*) malloc(sizeof(cell) * NCSIDE * NCSIDE);
-}
-
-#pragma omp declare reduction \
-    (redcell:cell*:omp_out=reduceCellsMatrix(omp_out,omp_in)) \
-    initializer(omp_priv=initMatrix(omp_priv))
-
+/**
+ * Utility Methods
+ */
 
 void init_particles(long seed, long ncside, long long n_part, particle_t *par)
 {
@@ -62,12 +48,6 @@ void init_particles(long seed, long ncside, long long n_part, particle_t *par)
         par[i].m = RND0_1 * ncside / (G * 1e6 * n_part);
     }
 }
-
-//#include <omp.h>
-
-/**
- * Utility Methods
- */
 
 /**
  * Update the matrix coordinates of each particle
@@ -168,11 +148,39 @@ void compute_cell_center_mass_2(particle_t *particles, long length, cell * cells
     };
 }
 
-void compute_cell_center_mass(particle_t *particles, long length, cell * cells, long ncside) {
+/**
+ * Reduces two arrays of cells into one (reduction function of redcell)
+ *
+ * @param a     accumulated array
+ * @param b     incoming array, which will be deallocated from memory
+ */
+cell * reduceCellsMatrix (cell * a, cell * b){
+    for (long cellIndex = 0; cellIndex < NCSIDE; cellIndex++){
+            a[cellIndex].x += b[cellIndex].x;
+            a[cellIndex].y += b[cellIndex].y;
+            a[cellIndex].y += b[cellIndex].m;
+    }
+    free(b);
+    return a;
+}
 
+/**
+ * Feeds the redcell reductor with a clean array of cells
+ */
+cell * initMatrix(){
+    return (cell*) malloc(sizeof(cell) * NCSIDE * NCSIDE);
+}
+
+void compute_cell_center_mass(particle_t *particles, long length, cell * cells, long ncside) {
     /*
     * This implementation creates an array for each thread. After that, we reduce those matrices into @cells
     */ 
+
+   #pragma omp declare reduction \
+        (redcell:cell*:omp_out=reduceCellsMatrix(omp_out,omp_in)) \
+        initializer(omp_priv=initMatrix(omp_priv))
+
+
     #pragma omp parallel
     {   
         #pragma omp for reduction(redcell:cells)
@@ -190,8 +198,6 @@ void compute_cell_center_mass(particle_t *particles, long length, cell * cells, 
         }
         
     };
-
-    //falta fazer o free daquela cena lá de cima
 }
 
 /**
@@ -326,6 +332,27 @@ void compute_force_and_update_particles(particle_t *particles, int particles_len
 }
 
 /**
+ * Reduces two cells into one (reduction function of cntmassrdc)
+ *
+ * @param a     accumulated value
+ * @param b     incoming value
+ */
+cell reduceCell(cell a, cell b){
+    a.x += b.x;
+    a.y += b.y;
+    a.m += b.m;
+    return a;
+}
+
+/**
+ * Feeds the cntmassrdc reductor with a clean cell
+ */
+cell initCell(){
+    cell newCell = {x:0, y:0, m:0};
+    return newCell;
+}
+
+/**
  * Computes the center mass for each existing cell in grid
  *
  * @param particles     array of particles that compose the grid
@@ -333,11 +360,18 @@ void compute_force_and_update_particles(particle_t *particles, int particles_len
  */
 void compute_overall_center_mass(particle_t * particles, long length){
     cell overallCenterMass = {x:0, y:0, m:0};
+
+    #pragma omp declare reduction \
+        (cntmassrdc:cell:omp_out=reduceCell(omp_out,omp_in)) \
+        initializer(omp_priv=initCell(omp_priv))
+
+    #pragma omp parallel for reduction(cntmassrdc:overallCenterMass)
     for (long particleIndex = 0; particleIndex < length; particleIndex++){
         overallCenterMass.x += particles[particleIndex].x * particles[particleIndex].m;
         overallCenterMass.y += particles[particleIndex].y * particles[particleIndex].m;
         overallCenterMass.m += particles[particleIndex].m;
     }
+
     overallCenterMass.x /= overallCenterMass.m;
     overallCenterMass.y /= overallCenterMass.m;
     printf("%0.2f %0.2f \n", overallCenterMass.x, overallCenterMass.y);
