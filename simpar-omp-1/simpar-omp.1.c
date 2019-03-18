@@ -360,11 +360,11 @@ int main(int args_length, char* args[]) {
 
     double cell_dimension = 0;
     cell ** cellMatrix = create_grid(particles, n_part, NCSIDE, &cell_dimension);
-    clean_cells(cellMatrix, NCSIDE);
+
     for(int i = 0; i < iterations; i++){
+        clean_cells(cellMatrix, NCSIDE);
         compute_cell_center_mass(particles, n_part, cellMatrix, NCSIDE);
         compute_force_and_update_particles(particles, n_part, cellMatrix, NCSIDE, cell_dimension);
-        clean_cells(cellMatrix, NCSIDE);
     }
 
     printf("%0.2f %0.2f \n", particles[0].x, particles[0].y);
