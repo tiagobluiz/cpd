@@ -79,11 +79,9 @@ int mod (int dividend, int diviser){
  * @param ncside    sides of the grid (how many rows the grid has)
  */
 void clean_cells(cell ** cells, long ncside){
-    for (long cellRowIndex = 0; cellRowIndex < ncside; cellRowIndex++){
-        for (long cellColumnIndex = 0; cellColumnIndex < ncside; cellColumnIndex++){
-            cells[cellRowIndex][cellColumnIndex].x = cells[cellRowIndex][cellColumnIndex].y =
-            cells[cellRowIndex][cellColumnIndex].m = cells[cellRowIndex][cellColumnIndex].part = 0;
-        }
+    for (long cellIndex = 0; cellIndex < ncside * ncside; cellIndex++){
+        cells[cellIndex].x = cells[cellIndex].y =
+        cells[cellIndex].m = 0;
     }
 }
 
@@ -101,11 +99,7 @@ void clean_cells(cell ** cells, long ncside){
  */
 cell ** create_grid(particle_t * particles, long long length, long ncside, double *cell_dimension){
     //Allocation of the cells
-    cell ** grid = (cell **) malloc(sizeof(cell*) * ncside + sizeof(cell) * ncside * ncside);
-
-    cell * ptr = grid + ncside;
-    for(int i = 0; i < ncside; i++)
-        grid[i] = (ptr + ncside * i);
+    cell * grid = (cell*) malloc(sizeof(cell) * ncside * ncside);
 
     *cell_dimension = MAX_COORDINATES_VALUE/ncside;
 
@@ -125,44 +119,18 @@ cell ** create_grid(particle_t * particles, long long length, long ncside, doubl
  * @param ncside    sides of the grid (how many rows the grid has)
  */
 void compute_cell_center_mass(particle_t *particles, long length, cell ** cells, long ncside) {
-
-  /*  #pragma omp parallel{
-    /**
-     * criar um array por thread, e cada um ter o seu. O array teria o length de ncside + ncside
-     * dado que cada thread teria o seu array, a posição da celula a ser afetada seria dada pela soma do cellX + cellY
-     * no final um outro for juntaria essas threads
-     *//*
-//        cell ** temporaryCells[#NUM_THREADS][ncside + ncside];
-        #pragma omp for{
-            for (long particleIndex = 0; particleIndex < length; particleIndex++) {
-                particle_t particle = particles[particleIndex];
-                cells[omp_get_thread_num()][particle.cellX + particle.cellY].x += particle.m * particle.x;
-                cells[omp_get_thread_num()][particle.cellX + particle.cellY].y += particle.m * particle.y;
-                cells[omp_get_thread_num()][particle.cellX + particle.cellY].m += particle.m;
-                cells[omp_get_thread_num()][particle.cellX + particle.cellY].part += 1;
-            }
-        }
-        #pragma omp for{
-            for (int threadUsed = 0; threadUsed < #NUM_THREADS; threadUsed++){
-                //ir buscar a cada array e juntar no final a cells
-            }
-        }
-    };*/
-
     for (long particleIndex = 0; particleIndex < length; particleIndex++){
         particle_t particle = particles[particleIndex];
-        cells[particle.cellX][particle.cellY].x += particle.m * particle.x;
-        cells[particle.cellX][particle.cellY].y += particle.m * particle.y;
-        cells[particle.cellX][particle.cellY].m += particle.m;
+        cells[particle.cellX * ncside + particle.cellY].x += particle.m * particle.x;
+        cells[particle.cellX * ncside + particle.cellY].y += particle.m * particle.y;
+        cells[particle.cellX * ncside + particle.cellY].m += particle.m;
         cells[particle.cellX][particle.cellY].part += 1;
     }
 
     //#pragma omp parallel for
-    for (long cellRowIndex = 0; cellRowIndex < ncside; cellRowIndex++){
-        for (long cellColumnIndex = 0; cellColumnIndex < ncside; cellColumnIndex++){
-            cells[cellRowIndex][cellColumnIndex].x /= cells[cellRowIndex][cellColumnIndex].m;
-            cells[cellRowIndex][cellColumnIndex].y /= cells[cellRowIndex][cellColumnIndex].m;
-        }
+    for (long cellIndex = 0; cellIndex < ncside; cellIndex++){
+        cells[cellIndex].x /= cells[cellIndex].m;
+        cells[cellIndex].y /= cells[cellIndex].m;
     }
 }
 
@@ -222,22 +190,22 @@ cell * get_cell(long long unbounded_row, long long unbounded_column, cell **cell
     int bounded_column = mod(unbounded_column, ncside);
 
     if((unbounded_row >= ncside && unbounded_column >= ncside) || (unbounded_row < 0 && unbounded_column < 0)){
-        return_cell->x = unbounded_column*cell_dimension + cells[bounded_row][bounded_column].x;
-        return_cell->y = unbounded_row*cell_dimension + cells[bounded_row][bounded_column].y;
-        return_cell->m = cells[bounded_row][bounded_column].m;
+        return_cell->x = unbounded_column*cell_dimension + cells[bounded_row * ncside + bounded_column].x;
+        return_cell->y = unbounded_row*cell_dimension + cells[bounded_row * ncside + bounded_column].y;
+        return_cell->m = cells[bounded_row * ncside + bounded_column].m;
     }
     else if(unbounded_row >= ncside || unbounded_row < 0){
-        return_cell->y = unbounded_row*cell_dimension + cells[bounded_row][bounded_column].y;
-        return_cell->x = cells[bounded_row][bounded_column].x;
-        return_cell->m = cells[bounded_row][bounded_column].m;
+        return_cell->y = unbounded_row*cell_dimension + cells[bounded_row * ncside + bounded_column].y;
+        return_cell->x = cells[bounded_row * ncside + bounded_column].x;
+        return_cell->m = cells[bounded_row * ncside + bounded_column].m;
     }
     else if(unbounded_column >= ncside || unbounded_column < 0){
-        return_cell->x = unbounded_column*cell_dimension + cells[bounded_row][bounded_column].x;
-        return_cell->y = cells[bounded_row][bounded_column].y;
-        return_cell->m = cells[bounded_row][bounded_column].m;
+        return_cell->x = unbounded_column*cell_dimension + cells[bounded_row * ncside + bounded_column].x;
+        return_cell->y = cells[bounded_row * ncside + bounded_column].y;
+        return_cell->m = cells[bounded_row * ncside + bounded_column].m;
     }
     else {
-        return &cells[bounded_row][bounded_column];
+        return &cells[bounded_row * ncside + bounded_column];
     }
 
     return return_cell;
@@ -333,9 +301,9 @@ int main(int args_length, char* args[]) {
     cell ** cellMatrix = create_grid(particles, n_part, ncside, &cell_dimension);
 
     for(int i = 0; i < iterations; i++){
-        compute_cell_center_mass(particles, n_part, cellMatrix, ncside);
-        compute_force_and_update_particles(particles, n_part, cellMatrix, ncside, cell_dimension);
         clean_cells(cellMatrix, ncside);
+        compute_cell_center_mass(particles, n_part, cellMatrix, ncside);
+        compute_force_and_update_particles(particles, n_part, cellMatrix, ncside, cell_dimension);  
     }
 
     printf("%0.2f %0.2f \n", particles[0].x, particles[0].y);

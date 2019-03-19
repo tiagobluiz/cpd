@@ -79,8 +79,7 @@ int mod (int dividend, int diviser){
  * @param ncside    sides of the grid (how many rows the grid has)
  */
 void clean_cells(cell * cells, long ncside){
-    long cellColumnIndex;
-    #pragma omp parallel for private(cellColumnIndex)
+    #pragma omp parallel for
     for (long cellIndex = 0; cellIndex < ncside * ncside; cellIndex++){
         cells[cellIndex].x = cells[cellIndex].y =
         cells[cellIndex].m = 0;
@@ -137,9 +136,8 @@ void compute_cell_center_mass_2(particle_t *particles, long length, cell * cells
             #pragma omp atomic
             cells[particle.cellX * ncside + particle.cellY].m += particle.m;
         }
-
-        long cellColumnIndex;
-        #pragma omp for private(cellColumnIndex)                                   // Each thread is responsible for a row
+        // Each thread is responsible for a row
+        #pragma omp for                                 
         for (long cellIndex = 0; cellIndex < ncside; cellIndex++){
             cells[cellIndex].x /= cells[cellIndex].m;
             cells[cellIndex].y /= cells[cellIndex].m;
