@@ -23,7 +23,6 @@ typedef struct {
     double x;
     double y;
     double m;
-    int part;
 }cell;
 
 void init_particles(long seed, long ncside, long long n_part, particle_t *par)
@@ -124,7 +123,6 @@ void compute_cell_center_mass(particle_t *particles, long length, cell * cells, 
         cells[particle.cellX * ncside + particle.cellY].x += particle.m * particle.x;
         cells[particle.cellX * ncside + particle.cellY].y += particle.m * particle.y;
         cells[particle.cellX * ncside + particle.cellY].m += particle.m;
-        cells[particle.cellX][particle.cellY].part += 1;
     }
 
     //#pragma omp parallel for
