@@ -78,7 +78,7 @@ int mod (int dividend, int diviser){
  * @param cells     bidimensional array with the grid of cells
  * @param ncside    sides of the grid (how many rows the grid has)
  */
-void clean_cells(cell ** cells, long ncside){
+void clean_cells(cell * cells, long ncside){
     for (long cellIndex = 0; cellIndex < ncside * ncside; cellIndex++){
         cells[cellIndex].x = cells[cellIndex].y =
         cells[cellIndex].m = 0;
@@ -97,7 +97,7 @@ void clean_cells(cell ** cells, long ncside){
  * @param ncside    The number of cells on each side of the matrix of cells
  * @return Matrix of cells and update the matrix coordenates of each particle
  */
-cell ** create_grid(particle_t * particles, long long length, long ncside, double *cell_dimension){
+cell * create_grid(particle_t * particles, long long length, long ncside, double *cell_dimension){
     //Allocation of the cells
     cell * grid = (cell*) malloc(sizeof(cell) * ncside * ncside);
 
@@ -118,7 +118,7 @@ cell ** create_grid(particle_t * particles, long long length, long ncside, doubl
  * @param cells     bidimensional array with the grid of cells
  * @param ncside    sides of the grid (how many rows the grid has)
  */
-void compute_cell_center_mass(particle_t *particles, long length, cell ** cells, long ncside) {
+void compute_cell_center_mass(particle_t *particles, long length, cell * cells, long ncside) {
     for (long particleIndex = 0; particleIndex < length; particleIndex++){
         particle_t particle = particles[particleIndex];
         cells[particle.cellX * ncside + particle.cellY].x += particle.m * particle.x;
@@ -184,7 +184,7 @@ void update_particle_position(particle_t * particle, double Fx, double Fy, long 
  * @param cell_dimension    dimension of each cell
  * @return                  the neighbor cell
  */
-cell * get_cell(long long unbounded_row, long long unbounded_column, cell **cells, cell * return_cell, long ncside,
+cell * get_cell(long long unbounded_row, long long unbounded_column, cell *cells, cell * return_cell, long ncside,
                 double cell_dimension){
     int bounded_row = mod(unbounded_row, ncside);
     int bounded_column = mod(unbounded_column, ncside);
@@ -220,7 +220,7 @@ cell * get_cell(long long unbounded_row, long long unbounded_column, cell **cell
  * @param ncside            number of cells in each side
  * @param cell_dimension    dimension of each cell
  */
-void compute_force_and_update_particles(particle_t *particles, int particles_length, cell **cells, long ncside,
+void compute_force_and_update_particles(particle_t *particles, int particles_length, cell *cells, long ncside,
                                         double cell_dimension){
 
     //iterate all particles
@@ -298,7 +298,7 @@ int main(int args_length, char* args[]) {
     init_particles(seed, ncside, n_part, particles);
 
     double cell_dimension = 0;
-    cell ** cellMatrix = create_grid(particles, n_part, ncside, &cell_dimension);
+    cell * cellMatrix = create_grid(particles, n_part, ncside, &cell_dimension);
 
     for(int i = 0; i < iterations; i++){
         clean_cells(cellMatrix, ncside);
