@@ -25,6 +25,10 @@ typedef struct {
     double m;
 }cell;
 
+/**
+ * Utility Methods
+ */
+
 void init_particles(long seed, long ncside, long long n_part, particle_t *par)
 {
     long long i;
@@ -41,12 +45,6 @@ void init_particles(long seed, long ncside, long long n_part, particle_t *par)
         par[i].m = RND0_1 * ncside / (G * 1e6 * n_part);
     }
 }
-
-//#include <omp.h>
-
-/**
- * Utility Methods
- */
 
 /**
  * Update the matrix coordinates of each particle
@@ -97,7 +95,6 @@ void clean_cells(cell * cells, long ncside){
  * @return Matrix of cells and update the matrix coordenates of each particle
  */
 cell * create_grid(particle_t * particles, long long length, long ncside, double *cell_dimension){
-    //Allocation of the cells
     cell * grid = (cell*) malloc(sizeof(cell) * ncside * ncside);
 
     *cell_dimension = MAX_COORDINATES_VALUE/ncside;
@@ -125,7 +122,6 @@ void compute_cell_center_mass(particle_t *particles, long length, cell * cells, 
         cells[particle.cellX * ncside + particle.cellY].m += particle.m;
     }
 
-    //#pragma omp parallel for
     for (long cellIndex = 0; cellIndex < ncside; cellIndex++){
         cells[cellIndex].x /= cells[cellIndex].m;
         cells[cellIndex].y /= cells[cellIndex].m;
@@ -309,10 +305,3 @@ int main(int args_length, char* args[]) {
     free(cellMatrix);
     free(particles);
 }
-
-
-
-
-
-
-
