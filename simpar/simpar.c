@@ -1,5 +1,3 @@
-#pragma once
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
@@ -122,7 +120,7 @@ void compute_cell_center_mass(particle_t *particles, long length, cell * cells, 
         cells[particle.cellX * ncside + particle.cellY].m += particle.m;
     }
 
-    for (long cellIndex = 0; cellIndex < ncside; cellIndex++){
+    for (long cellIndex = 0; cellIndex < ncside * ncside; cellIndex++){
         cells[cellIndex].x /= cells[cellIndex].m;
         cells[cellIndex].y /= cells[cellIndex].m;
     }

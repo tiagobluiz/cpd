@@ -1,8 +1,7 @@
-#pragma once
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <omp.h>
 
 #define RND0_1 ((double) random() / ((long long)1<<31))
 #define G 6.67408e-11
@@ -138,7 +137,7 @@ void compute_cell_center_mass_2(particle_t *particles, long length, cell * cells
         }
         // Each thread is responsible for a row
         #pragma omp for                                 
-        for (long cellIndex = 0; cellIndex < ncside; cellIndex++){
+        for (long cellIndex = 0; cellIndex < ncside * ncside; cellIndex++){
             cells[cellIndex].x /= cells[cellIndex].m;
             cells[cellIndex].y /= cells[cellIndex].m;
         }
@@ -153,10 +152,10 @@ void compute_cell_center_mass_2(particle_t *particles, long length, cell * cells
  * @param b     incoming array, which will be deallocated from memory
  */
 cell * reduceCellsMatrix (cell * a, cell * b){
-    for (long cellIndex = 0; cellIndex < NCSIDE; cellIndex++){
+    for (long cellIndex = 0; cellIndex < NCSIDE * NCSIDE; cellIndex++){
             a[cellIndex].x += b[cellIndex].x;
             a[cellIndex].y += b[cellIndex].y;
-            a[cellIndex].y += b[cellIndex].m;
+            a[cellIndex].m += b[cellIndex].m;
     }
     free(b);
     return a;
@@ -169,15 +168,14 @@ cell * initMatrix(){
     return (cell*) malloc(sizeof(cell) * NCSIDE * NCSIDE);
 }
 
-void compute_cell_center_mass(particle_t *particles, long length, cell * cells, long ncside) {
-    /*
-    * This implementation creates an array for each thread. After that, we reduce those matrices into @cells
-    */ 
-
-   #pragma omp declare reduction \
+#pragma omp declare reduction \
         (redcell:cell*:omp_out=reduceCellsMatrix(omp_out,omp_in)) \
         initializer(omp_priv=initMatrix(omp_priv))
 
+void compute_cell_center_mass(particle_t *particles, long length, cell * cells, long ncside) {
+    /*
+    * This implementation creates an array for each thread. After that, we reduce those matrices into @cells
+    */
 
     #pragma omp parallel
     {   
@@ -190,7 +188,7 @@ void compute_cell_center_mass(particle_t *particles, long length, cell * cells, 
         }
 
         #pragma omp for                                    // Each thread is responsible for a row
-        for (long cellIndex = 0; cellIndex < ncside; cellIndex++){
+        for (long cellIndex = 0; cellIndex < ncside * ncside; cellIndex++){
             cells[cellIndex].x /= cells[cellIndex].m;
             cells[cellIndex].y /= cells[cellIndex].m;
         }
@@ -391,7 +389,7 @@ int main(int args_length, char* args[]) {
     init_particles(seed, NCSIDE, n_part, particles);
 
     double cell_dimension = 0;
-    cell ** cellMatrix = create_grid(particles, n_part, NCSIDE, &cell_dimension);
+    cell * cellMatrix = create_grid(particles, n_part, NCSIDE, &cell_dimension);
 
     for(int i = 0; i < iterations; i++){
         clean_cells(cellMatrix, NCSIDE);
