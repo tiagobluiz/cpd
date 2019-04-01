@@ -5,7 +5,7 @@
 
 #define RND0_1 ((double) random() / ((long long)1<<31))
 #define G 6.67408e-11
-#define EPSLON 0.01
+#define EPSLON 0.0005
 #define MAX_COORDINATES_VALUE 1.0
 
 typedef struct {
@@ -251,23 +251,22 @@ cell * get_cell(long long unbounded_row, long long unbounded_column, cell *cells
     int bounded_row = mod(unbounded_row, ncside);
     int bounded_column = mod(unbounded_column, ncside);
 
-    if((unbounded_row >= ncside && unbounded_column >= ncside) || (unbounded_row < 0 && unbounded_column < 0)){
-        return_cell->x = unbounded_column*cell_dimension + cells[bounded_row * ncside + bounded_column].x;
-        return_cell->y = unbounded_row*cell_dimension + cells[bounded_row * ncside + bounded_column].y;
-        return_cell->m = cells[bounded_row * ncside + bounded_column].m;
-    }
-    else if(unbounded_row >= ncside || unbounded_row < 0){
-        return_cell->y = unbounded_row*cell_dimension + cells[bounded_row * ncside + bounded_column].y;
+    if (unbounded_column >= 0 && unbounded_column < ncside && unbounded_row >= 0 && unbounded_row < ncside){
+        return &cells[bounded_row * ncside + bounded_column];
+    } else {
         return_cell->x = cells[bounded_row * ncside + bounded_column].x;
-        return_cell->m = cells[bounded_row * ncside + bounded_column].m;
-    }
-    else if(unbounded_column >= ncside || unbounded_column < 0){
-        return_cell->x = unbounded_column*cell_dimension + cells[bounded_row * ncside + bounded_column].x;
         return_cell->y = cells[bounded_row * ncside + bounded_column].y;
         return_cell->m = cells[bounded_row * ncside + bounded_column].m;
-    }
-    else {
-        return &cells[bounded_row * ncside + bounded_column];
+
+        if (unbounded_column < 0)
+            return_cell->x -= MAX_COORDINATES_VALUE;
+        else if (unbounded_column >= ncside)
+            return_cell->x += MAX_COORDINATES_VALUE;
+
+        if (unbounded_row < 0)
+            return_cell->y -= MAX_COORDINATES_VALUE;
+        else if (unbounded_row >= ncside)
+            return_cell->y += MAX_COORDINATES_VALUE;
     }
 
     return return_cell;
