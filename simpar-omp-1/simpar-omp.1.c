@@ -111,41 +111,6 @@ cell * create_grid(particle_t * particles, long long length, long ncside, double
 }
 
 /**
- * Computes the center mass for each existing cell in grid
- *
- * @param particles array of particles that compose the grid
- * @param length    number of particles (must match @particles length)
- * @param cells     bidimensional array with the grid of cells
- * @param ncside    sides of the grid (how many rows the grid has)
- */
-void compute_cell_center_mass_2(particle_t *particles, long length, cell * cells, long ncside) {
-    /*
-    * Using atomic operations we avoid the problem that a thread is writing to the same cell, however other threads
-    * writing to different cells can continue their jobs, and thus decreasing runtime.
-    */
-    #pragma omp parallel
-    {   
-        #pragma omp for
-        for (long particleIndex = 0; particleIndex < length; particleIndex++) {
-            particle_t particle = particles[particleIndex];
-            #pragma omp atomic
-            cells[particle.cellX * ncside + particle.cellY].x += particle.m * particle.x;
-            #pragma omp atomic
-            cells[particle.cellX * ncside + particle.cellY].y += particle.m * particle.y;
-            #pragma omp atomic
-            cells[particle.cellX * ncside + particle.cellY].m += particle.m;
-        }
-        // Each thread is responsible for a row
-        #pragma omp for                                 
-        for (long cellIndex = 0; cellIndex < ncside * ncside; cellIndex++){
-            cells[cellIndex].x /= cells[cellIndex].m;
-            cells[cellIndex].y /= cells[cellIndex].m;
-        }
-        
-    };
-}
-
-/**
  * Reduces two arrays of cells into one (reduction function of redcell)
  *
  * @param a     accumulated array
