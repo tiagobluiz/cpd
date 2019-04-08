@@ -130,7 +130,7 @@ cell * reduceCellsMatrix (cell * a, cell * b){
  * Feeds the redcell reductor with a clean array of cells
  */
 cell * initMatrix(){
-    return (cell*) malloc(sizeof(cell) * NCSIDE * NCSIDE);
+    return (cell*) calloc(NCSIDE * NCSIDE, sizeof(cell));
 }
 
 #pragma omp declare reduction \
@@ -143,7 +143,7 @@ void compute_cell_center_mass(particle_t *particles, long length, cell * cells, 
     */
 
     #pragma omp parallel
-    {   
+    {
         #pragma omp for reduction(redcell:cells)
         for (long particleIndex = 0; particleIndex < length; particleIndex++) {
             particle_t particle = particles[particleIndex];
@@ -157,7 +157,7 @@ void compute_cell_center_mass(particle_t *particles, long length, cell * cells, 
             cells[cellIndex].x /= cells[cellIndex].m;
             cells[cellIndex].y /= cells[cellIndex].m;
         }
-        
+
     };
 }
 
