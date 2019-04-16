@@ -12,6 +12,8 @@
 #define BLOCK_HIGH(id,p,n) (BLOCK_LOW((id)+1,p,n)-1)
 #define BLOCK_SIZE(id,p,n) (BLOCK_HIGH(id,p,n)-BLOCK_LOW(id,p,n)-1)
 
+int NUMBER_OF_PROCESSES;
+
 
 typedef struct {
     double x;
@@ -113,18 +115,28 @@ cell * create_grid(particle_t * particles, long long length, long ncside, double
 /**
  * Computes the center mass for each existing cell in grid
  *
- * @param particles array of particles that compose the grid
- * @param length    number of particles (must match @particles length)
- * @param cells     bidimensional array with the grid of cells
- * @param ncside    sides of the grid (how many rows the grid has)
+ * @param particles     array of particles that compose the grid
+ * @param length        number of particles (must match @particles length)
+ * @param cells         bidimensional array with the grid of cells
+ * @param ncside        sides of the grid (how many rows the grid has)
+ * @param process_id    id of the process
  */
-void compute_cell_center_mass(particle_t *particles, long length, cell * cells, long ncside) {
-    for (long particleIndex = 0; particleIndex < length; particleIndex++){
+void compute_cell_center_mass(particle_t *particles, long length, cell * cells, long ncside, int process_id, MPI_Datatype * datatype) { 
+    //array copy??
+    cell * cellLocalMatrix = create_grid(particles, n_part, ncside, &cell_dimension);
+    clean_cells(cellLocalMatrix, ncside);
+
+    for(long particleIndex = BLOCK_LOW(process_id, NUMBER_OF_PROCESSES, length); 
+            particleIndex < BLOCK_SIZE(process_id, NUMBER_OF_PROCESSES, length); 
+            particleIndex++){
         particle_t particle = particles[particleIndex];
-        cells[particle.cellX * ncside + particle.cellY].x += particle.m * particle.x;
-        cells[particle.cellX * ncside + particle.cellY].y += particle.m * particle.y;
-        cells[particle.cellX * ncside + particle.cellY].m += particle.m;
+        cellLocalMatrix[particle.cellX * ncside + particle.cellY].x += particle.m * particle.x;
+        cellLocalMatrix[particle.cellX * ncside + particle.cellY].y += particle.m * particle.y;
+        cellLocalMatrix[particle.cellX * ncside + particle.cellY].m += particle.m;
     }
+
+    MPI_Allreduce(cellLocalMatrix, cells, ncside * ncside, &datatype, MPI_SUM!!!!, MPI_COMM_WORLD);
+
     for (long cellIndex = 0; cellIndex < ncside * ncside; cellIndex++){
         cells[cellIndex].x /= cells[cellIndex].m;
         cells[cellIndex].y /= cells[cellIndex].m;
@@ -219,11 +231,13 @@ void compute_force_and_update_particles(particle_t *particles, int particles_len
                                         double cell_dimension){
 
     //iterate all particles
-    for(int i = 0; i < particles_length; i++ ){
+    for(long particleIndex = BLOCK_LOW(process_id, NUMBER_OF_PROCESSES, length); 
+            particleIndex < BLOCK_SIZE(process_id, NUMBER_OF_PROCESSES, length); 
+            particleIndex++){
 
         //get the coordinates of the cell where the particle is located
-        long long cell_x = particles[i].cellX;
-        long long cell_y = particles[i].cellY;
+        long long cell_x = particles[particleIndex].cellX;
+        long long cell_y = particles[particleIndex].cellY;
 
         //resultant force in X and Y
         double Fx = 0;
@@ -241,19 +255,21 @@ void compute_force_and_update_particles(particle_t *particles, int particles_len
                     continue;
 
                 //compute angle
-                double delta_x = neighbor_cell->x - particles[i].x;
-                double delta_y = neighbor_cell->y - particles[i].y;
+                double delta_x = neighbor_cell->x - particles[particleIndex].x;
+                double delta_y = neighbor_cell->y - particles[particleIndex].y;
                 double vector_angle = atan2(delta_y, delta_x);
 
                 //compute force
-                double force = compute_magnitude_force(&particles[i], neighbor_cell);
+                double force = compute_magnitude_force(&particles[particleIndex], neighbor_cell);
                 Fx += force * cos(vector_angle);
                 Fy += force * sin(vector_angle);
             }
         }
 
         //update the particle position
-        update_particle_position(&particles[i], Fx, Fy, ncside);
+        update_particle_position(&particles[particleIndex], Fx, Fy, ncside);
+
+        
     }
 }
 
@@ -273,7 +289,6 @@ void compute_overall_center_mass(particle_t * particles, long length){
     overallCenterMass.x /= overallCenterMass.m;
     overallCenterMass.y /= overallCenterMass.m;
     printf("%0.2f %0.2f \n", overallCenterMass.x, overallCenterMass.y);
-
 }
 
 void mapCellToMPI(MPI_Datatype * newType){
