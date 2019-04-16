@@ -8,6 +8,11 @@
 #define EPSLON 0.0005
 #define MAX_COORDINATES_VALUE 1.0
 
+#define BLOCK_LOW(id,p,n)  ((id)*(n)/(p))
+#define BLOCK_HIGH(id,p,n) (BLOCK_LOW((id)+1,p,n)-1)
+#define BLOCK_SIZE(id,p,n) (BLOCK_HIGH(id,p,n)-BLOCK_LOW(id,p,n)-1)
+
+
 typedef struct {
     double x;
     double y;
@@ -120,7 +125,6 @@ void compute_cell_center_mass(particle_t *particles, long length, cell * cells, 
         cells[particle.cellX * ncside + particle.cellY].y += particle.m * particle.y;
         cells[particle.cellX * ncside + particle.cellY].m += particle.m;
     }
-
     for (long cellIndex = 0; cellIndex < ncside * ncside; cellIndex++){
         cells[cellIndex].x /= cells[cellIndex].m;
         cells[cellIndex].y /= cells[cellIndex].m;
@@ -328,10 +332,12 @@ int main(int args_length, char* args[]) {
         compute_force_and_update_particles(particles, n_part, cellMatrix, ncside, cell_dimension);  
     }
 
+    MPI_Finalize();//ahhh... tipo, yah #agoraéfácil #duro
+
     printf("%0.2f %0.2f \n", particles[0].x, particles[0].y);
     compute_overall_center_mass(particles, n_part);
     free(cellMatrix);
     free(particles);
     
-    MPI_Finalize();
+    
 }
