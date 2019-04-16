@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <mpi.h>
 
 #define RND0_1 ((double) random() / ((long long)1<<31))
 #define G 6.67408e-11
@@ -12,9 +13,9 @@ typedef struct {
     double y;
     double vx;
     double vy;
-    long long cellX;
-    long long cellY;
     double m;
+    long cellX;
+    long cellY;  
 }particle_t;
 
 typedef struct {
@@ -271,6 +272,25 @@ void compute_overall_center_mass(particle_t * particles, long length){
 
 }
 
+void mapCellToMPI(MPI_Datatype * newType){
+    int numberOfDoubles = 3;
+    MPI_Aint indices[] = {0};
+    MPI_Datatype oldTypes[] = {MPI_DOUBLE};
+    MPI_Type_struct(1, &numberOfDoubles, indices, oldTypes, newType);
+    MPI_Type_Commit(newType);
+}
+
+void mapParticleToMPI(MPI_Datatype * newType){
+    int blocklens[] = {5 /*doubles*/,2 /*long long*/};
+    MPI_Aint extent;
+    MPI_Type_extent(MPI_DOUBLE, &extent);
+    MPI_Aint indices[] = {0, 5 * extent /* we have 5 doubles */};
+    MPI_Datatype oldTypes[] = {MPI_DOUBLE, MPI_LONG};
+    MPI_Type_struct(1, &numberOfDoubles, indices, oldTypes, newType);
+    MPI_Type_Commit(newType);
+}
+
+
 int main(int args_length, char* args[]) {
     if (args_length < 4) {
         printf("Incorrect number of arguments! It should be 4!");
@@ -284,10 +304,23 @@ int main(int args_length, char* args[]) {
 
     particle_t * particles = calloc(n_part, sizeof(particle_t));
 
-    init_particles(seed, ncside, n_part, particles);
+    init_particles(seed, ncside, n_part, particles); 
 
     double cell_dimension = 0;
     cell * cellMatrix = create_grid(particles, n_part, ncside, &cell_dimension);
+
+    int me, nprocs;
+    MPI_Init( &args_length, &args);
+    MPI_Comm_size(MPI_COMM_WORLD, &nprocs);
+    MPI_Comm_rank(MPI_COMM_WORLD, &me);
+
+    MPI_Datatype cellMPIType;
+    mapCellToMPI(&cellMPIType);
+    MPI_Datatype particleMPIType;
+    mapParticleToMPI(&particleMPIType);
+
+    MPI_BCast(cellMatrix, ncside * ncside, cellMPIType, 0, MPI_COMM_WORLD);
+    MPI_BCast(particles, nparticles, particleMPIType, 0, MPI_COMM_WORLD);
 
     for(int i = 0; i < iterations; i++){
         clean_cells(cellMatrix, ncside);
@@ -299,4 +332,6 @@ int main(int args_length, char* args[]) {
     compute_overall_center_mass(particles, n_part);
     free(cellMatrix);
     free(particles);
+    
+    MPI_Finalize();
 }
