@@ -142,10 +142,12 @@ void reduceCellsMatrix (cell * in, cell * out, int *len , MPI_Datatype *datatype
  * @param ncside        sides of the grid (how many rows the grid has)
  * @param process_id    id of the process
  */
-void compute_cell_center_mass(particle_t *particles, long length, cell * cells, long ncside, int cell_dimension, int process_id, MPI_Datatype * datatype) { 
+void compute_cell_center_mass(particle_t *particles, long length, cell * cells, long ncside, int cell_dimension, int process_id, MPI_Datatype datatype) { 
     //array copy??
-    cell * cellLocalMatrix = create_grid(particles, length, ncside, &cell_dimension);
-    //clean_cells(cellLocalMatrix, ncside);
+    //cell * cellLocalMatrix = create_grid(particles, length, ncside, &cell_dimension);
+    clean_cells(cells, ncside);
+    cell cellLocalMatrix[ncside * ncside];
+    memcpy(cellLocalMatrix, cells, ncside * ncside);
 
     for(long particleIndex = BLOCK_LOW(process_id, NUMBER_OF_PROCESSES, length); 
             particleIndex < BLOCK_SIZE(process_id, NUMBER_OF_PROCESSES, length); 
@@ -156,7 +158,7 @@ void compute_cell_center_mass(particle_t *particles, long length, cell * cells, 
         cellLocalMatrix[particle.cellX * ncside + particle.cellY].m += particle.m;
     }
 
-    MPI_Allreduce(cellLocalMatrix, cells, ncside * ncside, &datatype, reduceCellOp, MPI_COMM_WORLD);
+    MPI_Allreduce(cellLocalMatrix, cells, ncside * ncside, datatype, reduceCellOp, MPI_COMM_WORLD);
 
     for (long cellIndex = 0; cellIndex < ncside * ncside; cellIndex++){
         cells[cellIndex].x /= cells[cellIndex].m;
@@ -297,11 +299,11 @@ void compute_force_and_update_particles(particle_t *particles, int particles_len
 
     for(int i =0; i<NUMBER_OF_PROCESSES; i++){
         if(i!=process_id){
-            MPI_BCast(particleReceive, BLOCK_SIZE(process_id, NUMBER_OF_PROCESSES, particles_length), particleMPIType, process_id, MPI_COMM_WORLD);
+            MPI_Bcast(particleReceive, BLOCK_SIZE(process_id, NUMBER_OF_PROCESSES, particles_length), particleMPIType, process_id, MPI_COMM_WORLD);
             memcpy(&particles[BLOCK_LOW(i, NUMBER_OF_PROCESSES, particles_length)], particleReceive, BLOCK_SIZE(i, NUMBER_OF_PROCESSES, particles_length));
         }
         else
-            MPI_BCast(particleCopy, BLOCK_SIZE(process_id, NUMBER_OF_PROCESSES, particles_length), particleMPIType, process_id, MPI_COMM_WORLD);
+            MPI_Bcast(particleCopy, BLOCK_SIZE(process_id, NUMBER_OF_PROCESSES, particles_length), particleMPIType, process_id, MPI_COMM_WORLD);
     }
 }
 
@@ -328,7 +330,7 @@ void mapCellToMPI(MPI_Datatype * newType){
     MPI_Aint indices[] = {0};
     MPI_Datatype oldTypes[] = {MPI_DOUBLE};
     MPI_Type_struct(1, &numberOfDoubles, indices, oldTypes, newType);
-    MPI_Type_Commit(newType);
+    MPI_Type_commit(newType);
 }
 
 void mapParticleToMPI(MPI_Datatype * newType){
@@ -338,7 +340,7 @@ void mapParticleToMPI(MPI_Datatype * newType){
     MPI_Aint indices[] = {0, 5 * extent /* we have 5 doubles */};
     MPI_Datatype oldTypes[] = {MPI_DOUBLE, MPI_LONG};
     MPI_Type_struct(1, blocklens, indices, oldTypes, newType);
-    MPI_Type_Commit(newType);
+    MPI_Type_commit(newType);
 }
 
 
@@ -371,18 +373,18 @@ int main(int args_length, char* args[]) {
             MAX_BLOCK_SIZE = blockSize;
     }
 
-    MPI_OP_create(reduceCellsMatrix, 1, &reduceCellOp);
+    MPI_Op_create(reduceCellsMatrix, 1, &reduceCellOp);
 
     MPI_Datatype cellMPIType;
     mapCellToMPI(&cellMPIType);
     mapParticleToMPI(&particleMPIType);
 
-    MPI_BCast(cellMatrix, ncside * ncside, cellMPIType, 0, MPI_COMM_WORLD);
-    MPI_BCast(particles, n_part, particleMPIType, 0, MPI_COMM_WORLD);
+    MPI_Bcast(cellMatrix, ncside * ncside, cellMPIType, 0, MPI_COMM_WORLD);
+    MPI_Bcast(particles, n_part, particleMPIType, 0, MPI_COMM_WORLD);
 
     for(int i = 0; i < iterations; i++){
         clean_cells(cellMatrix, ncside);
-        compute_cell_center_mass(particles, n_part, cellMatrix, ncside, cell_dimension, me, &cellMPIType);
+        compute_cell_center_mass(particles, n_part, cellMatrix, ncside, cell_dimension, me, cellMPIType);
         compute_force_and_update_particles(particles, n_part, cellMatrix, ncside, cell_dimension, me);  
     }
 

@@ -1,7 +1,11 @@
-cmake_minimum_required(VERSION 3.13)
-project(simpar_mpi C)
+cmake_minimum_required(VERSION 3.3)
+project(simpar-mpi)
 
-set(CMAKE_C_STANDARD 11)
+find_package(MPI REQUIRED)
+include_directories(${MPI_INCLUDE_PATH})
 
-add_executable(simpar_mpi
-        simpar-mpi.c)
+SET(CMAKE_C_COMPILER mpicc)
+SET(CMAKE_CXX_COMPILER mpicxx)
+
+set(SOURCE_FILES simpar-mpi.c)
+add_executable(simpar-mpi ${SOURCE_FILES})
