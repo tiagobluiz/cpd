@@ -11,7 +11,7 @@
 
 #define BLOCK_LOW(id,p,n)  ((id)*(n)/(p))
 #define BLOCK_HIGH(id,p,n) (BLOCK_LOW((id)+1,p,n)-1)
-#define BLOCK_SIZE(id,p,n) (BLOCK_HIGH(id,p,n)-BLOCK_LOW(id,p,n)-1)
+#define BLOCK_SIZE(id,p,n) (BLOCK_HIGH(id,p,n)-BLOCK_LOW(id,p,n)+1)
 
 int NUMBER_OF_PROCESSES;
 long NCSIDE, MAX_BLOCK_SIZE=0;
@@ -299,11 +299,17 @@ void compute_force_and_update_particles(particle_t *particles, int particles_len
 
     for(int i =0; i<NUMBER_OF_PROCESSES; i++){
         if(i!=process_id){
+            printf("entrei");
             MPI_Bcast(particleReceive, BLOCK_SIZE(process_id, NUMBER_OF_PROCESSES, particles_length), particleMPIType, process_id, MPI_COMM_WORLD);
             memcpy(&particles[BLOCK_LOW(i, NUMBER_OF_PROCESSES, particles_length)], particleReceive, BLOCK_SIZE(i, NUMBER_OF_PROCESSES, particles_length));
         }
-        else
-            MPI_Bcast(particleCopy, BLOCK_SIZE(process_id, NUMBER_OF_PROCESSES, particles_length), particleMPIType, process_id, MPI_COMM_WORLD);
+        else{
+            int bh = BLOCK_HIGH(process_id,NUMBER_OF_PROCESSES,particles_length);
+            int bl = BLOCK_LOW(process_id,NUMBER_OF_PROCESSES,particles_length);
+            int bz = BLOCK_SIZE(process_id,NUMBER_OF_PROCESSES,particles_length);
+            printf("PID:%d, i:%d, bz:%d, bh:%d, bl:%d , particles_length:%d\n", process_id, i, bz, bh, bl, particles_length);
+            MPI_Bcast(particleCopy, BLOCK_SIZE(process_id,NUMBER_OF_PROCESSES,particles_length), particleMPIType, process_id, MPI_COMM_WORLD);
+        }
     }
 }
 
