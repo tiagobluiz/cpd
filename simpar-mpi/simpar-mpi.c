@@ -18,7 +18,7 @@ long NCSIDE, MAX_BLOCK_SIZE=0;
 
 MPI_Op reduceCellOp;
 MPI_Datatype particleMPIType;
-
+MPI_Datatype cellMPIType;
 
 typedef struct {
     double x;
@@ -142,14 +142,15 @@ void reduceCellsMatrix (cell * in, cell * out, int *len , MPI_Datatype *datatype
  * @param ncside        sides of the grid (how many rows the grid has)
  * @param process_id    id of the process
  */
+double x = 0;
 void compute_cell_center_mass(particle_t *particles, long length, cell * cells, long ncside, int cell_dimension, int process_id, MPI_Datatype datatype) { 
     //array copy??
     //cell * cellLocalMatrix = create_grid(particles, length, ncside, &cell_dimension);
     clean_cells(cells, ncside);
-    cell cellLocalMatrix[ncside * ncside];
+    cell * cellLocalMatrix = (cell*) calloc(ncside * ncside, sizeof(cell));//[ncside * ncside];
     memcpy(cellLocalMatrix, cells, ncside * ncside);
-
-    for(long particleIndex = BLOCK_LOW(process_id, NUMBER_OF_PROCESSES, length); 
+    long particleIndex;
+    for(particleIndex = BLOCK_LOW(process_id, NUMBER_OF_PROCESSES, length);
             particleIndex < BLOCK_SIZE(process_id, NUMBER_OF_PROCESSES, length); 
             particleIndex++){
         particle_t particle = particles[particleIndex];
@@ -158,12 +159,18 @@ void compute_cell_center_mass(particle_t *particles, long length, cell * cells, 
         cellLocalMatrix[particle.cellX * ncside + particle.cellY].m += particle.m;
     }
 
-    MPI_Allreduce(cellLocalMatrix, cells, ncside * ncside, datatype, reduceCellOp, MPI_COMM_WORLD);
+    printf("before executing reduce\n");
+//    MPI_Allreduce(cellLocalMatrix, cells, ncside * ncside, cellMPIType, reduceCellOp, MPI_COMM_WORLD);
+    MPI_Reduce(particleIndex, &x, 1, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
 
+    printf("reduced x %d", x);
+    free(cellLocalMatrix);
     for (long cellIndex = 0; cellIndex < ncside * ncside; cellIndex++){
         cells[cellIndex].x /= cells[cellIndex].m;
         cells[cellIndex].y /= cells[cellIndex].m;
     }
+
+
 }
 
 /**
@@ -299,7 +306,7 @@ void compute_force_and_update_particles(particle_t *particles, int particles_len
 
     for(int i =0; i<NUMBER_OF_PROCESSES; i++){
         if(i!=process_id){
-            printf("entrei");
+            printf("entrei\n");
             MPI_Bcast(particleReceive, BLOCK_SIZE(process_id, NUMBER_OF_PROCESSES, particles_length), particleMPIType, process_id, MPI_COMM_WORLD);
             memcpy(&particles[BLOCK_LOW(i, NUMBER_OF_PROCESSES, particles_length)], particleReceive, BLOCK_SIZE(i, NUMBER_OF_PROCESSES, particles_length));
         }
@@ -331,22 +338,25 @@ void compute_overall_center_mass(particle_t * particles, long length){
     printf("%0.2f %0.2f \n", overallCenterMass.x, overallCenterMass.y);
 }
 
-void mapCellToMPI(MPI_Datatype * newType){
-    int numberOfDoubles = 3;
-    MPI_Aint indices[] = {0};
-    MPI_Datatype oldTypes[] = {MPI_DOUBLE};
-    MPI_Type_struct(1, &numberOfDoubles, indices, oldTypes, newType);
-    MPI_Type_commit(newType);
+void mapCellToMPI(cell * cells){
+    int numberOfDoubles[1] = {3};
+    MPI_Aint indices[1];
+    indices[0] = &cells[0].m - &cells[0].x;
+    MPI_Datatype types[] = {MPI_DOUBLE};
+
+    MPI_Type_create_struct(1, numberOfDoubles, indices, types, &cellMPIType);
+    MPI_Type_commit(&cellMPIType);
 }
 
-void mapParticleToMPI(MPI_Datatype * newType){
+void mapParticleToMPI(particle_t * particles){
     int blocklens[] = {5 /*doubles*/,2 /*long long*/};
-    MPI_Aint extent;
-    MPI_Type_extent(MPI_DOUBLE, &extent);
-    MPI_Aint indices[] = {0, 5 * extent /* we have 5 doubles */};
-    MPI_Datatype oldTypes[] = {MPI_DOUBLE, MPI_LONG};
-    MPI_Type_struct(1, blocklens, indices, oldTypes, newType);
-    MPI_Type_commit(newType);
+    MPI_Aint indices[2];// = {0, 5 * extent /* we have 5 doubles */};
+    indices[0] = &particles[0].m - &particles[0].x;
+    indices[1] = &particles[0].cellY - &particles[0].cellX;
+    MPI_Datatype types[] = {MPI_DOUBLE, MPI_LONG};
+
+    MPI_Type_create_struct(2, blocklens, indices, types, &particleMPIType);
+    MPI_Type_commit(&particleMPIType);
 }
 
 
@@ -356,14 +366,28 @@ int main(int args_length, char* args[]) {
         return -1;
     }
 
-    long seed = strtol(args[1], NULL, 10);
-    long ncside = NCSIDE = strtol(args[2], NULL, 10);
-    long long n_part = strtol(args[3], NULL, 10);
-    long iterations = strtol(args[4], NULL, 10);
+    int factor = 0;
+    if (args_length == 8) factor = 3;
+
+    printf("factor %d\n", factor);
+
+    for(int i = 0; i < args_length;i++){
+        printf("arg %d: (lu)%lu (s)%s\n", i, args[i], args[i]);
+    }
+
+    long seed = strtol(args[1+factor], NULL, 10);
+    long ncside = NCSIDE = strtol(args[2+factor], NULL, 10);
+    long long n_part = strtol(args[3+factor], NULL, 10);
+    long iterations = strtol(args[4+factor], NULL, 10);
+
+    printf("%lu\n",seed);
+    printf("%lu\n",ncside);
+    printf("%lu\n",n_part);
+    printf("%lu\n",iterations);
 
     particle_t * particles = calloc(n_part, sizeof(particle_t));
 
-    init_particles(seed, ncside, n_part, particles); 
+    init_particles(seed, ncside, n_part, particles);
 
     double cell_dimension = 0;
     cell * cellMatrix = create_grid(particles, n_part, ncside, &cell_dimension);
@@ -373,25 +397,38 @@ int main(int args_length, char* args[]) {
     MPI_Comm_size(MPI_COMM_WORLD, &NUMBER_OF_PROCESSES);
     MPI_Comm_rank(MPI_COMM_WORLD, &me);
 
+    // Obtain the maximum size of a block
     for(int i = 0; i < NUMBER_OF_PROCESSES;i++){
         long blockSize = BLOCK_SIZE(i, NUMBER_OF_PROCESSES, n_part);
         if(blockSize>MAX_BLOCK_SIZE)
             MAX_BLOCK_SIZE = blockSize;
     }
 
-    MPI_Op_create(reduceCellsMatrix, 1, &reduceCellOp);
+    printf("create func\n");
+    // Define operations
+    MPI_Op_create((MPI_User_function *) reduceCellsMatrix, 1, &reduceCellOp);
+    printf("create cells\n");
+    mapCellToMPI(cellMatrix);
+    printf("create particles\n");
+    mapParticleToMPI(particles);
 
-    MPI_Datatype cellMPIType;
-    mapCellToMPI(&cellMPIType);
-    mapParticleToMPI(&particleMPIType);
+//    printf("Print particles of processor %d\n", me);
+//    for (int i = 0; i < n_part; i++){
+//        printf("Particle %d: %lu,%lu,%f,%d,%d\n", i, particles[i].x,particles[i].y,particles[i].m,particles[i].cellX,particles[i].cellY);
+//    }
+//    printf("Print cells of processor %d\n", me);
+//    for (int i = 0; i < ncside * ncside; i++){
+//        printf("Cell %d: %lu,%lu,%f\n", i, cellMatrix[i].x,cellMatrix[i].y,cellMatrix[i].m);
+//    }
 
-    MPI_Bcast(cellMatrix, ncside * ncside, cellMPIType, 0, MPI_COMM_WORLD);
-    MPI_Bcast(particles, n_part, particleMPIType, 0, MPI_COMM_WORLD);
+    /*NOTE: There is no need for this broadcast, because each processor will execute the initiation process anyways*/
+//    MPI_Bcast(cellMatrix, ncside * ncside, cellMPIType, 0, MPI_COMM_WORLD);                                             // Broadcast the cells matrix
+//    MPI_Bcast(particles, n_part, particleMPIType, 0, MPI_COMM_WORLD);                                                   // Broadcast the particles array
 
     for(int i = 0; i < iterations; i++){
         clean_cells(cellMatrix, ncside);
         compute_cell_center_mass(particles, n_part, cellMatrix, ncside, cell_dimension, me, cellMPIType);
-        compute_force_and_update_particles(particles, n_part, cellMatrix, ncside, cell_dimension, me);  
+//        compute_force_and_update_particles(particles, n_part, cellMatrix, ncside, cell_dimension, me);
     }
 
     MPI_Finalize();
