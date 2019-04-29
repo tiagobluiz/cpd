@@ -34,36 +34,7 @@ typedef struct {
     double x;
     double y;
     double m;
-    particle_list * particles;
 }cell;
-
-typedef struct particle_list {
-	struct particle_list * prev;
-	struct particle_list * next;
-	particle_t * particle;
-}particle_list;
-
-particle_list * rmvlist( particle_list * list, particle_t * particle){
-    particle_list * curr = list;
-    while(curr->particle != particle && curr != NULL){
-        curr = curr->next;
-    }
-
-    curr->next->prev = curr->prev;
-    curr->prev->next = curr->next;
-
-    return curr;
-}
-
-particle_list * addlist( particle_list * list, particle_t * particle){
-    particle_list *newOne = (particle_list *)malloc(sizeof(particle_list));
-    newOne->particle = particle;
-
-    list->prev = newOne;
-    newOne->next = list;
-
-    return newOne;
-}
 
 /**
  * Utility Methods
@@ -92,14 +63,10 @@ void init_particles(long seed, long ncside, long long n_part, particle_t *par)
  * @param particle  A pointer to a particle
  * @param ncside    The number of cells on each side of the matrix of cells
  */
-void update_particle(particle_t *particle, cell * cellMatrix){
-    double sizeCell = MAX_COORDINATES_VALUE/NCSIDE;
+void update_particle(particle_t *particle, long ncside){
+    double sizeCell = MAX_COORDINATES_VALUE/ncside;
     particle->cellX = particle->x/sizeCell;
     particle->cellY = particle->y/sizeCell;
-    if(cellMatrix[particle->cellX * NCSIDE + particle->cellY].particles==NULL){
-        cellMatrix[particle->cellX * NCSIDE + particle->cellY].particles = calloc(1,sizeof(particle_list));
-    }
-    cellMatrix[particle->cellX * NCSIDE + particle->cellY].particles  
 }
 
 /**
@@ -138,9 +105,9 @@ void clean_cells(cell * cells, long ncside){
  * @param ncside    The number of cells on each side of the matrix of cells
  * @return Matrix of cells and update the matrix coordenates of each particle
  */
-void create_grid(particle_t * particles, long long length, cell * cellMatrix){
+cell * create_grid(particle_t * particles, long long length, long ncside){
     for(int i = 0; i < length; i++){
-        update_particle(&particles[i], cellMatrix);
+        update_particle(&particles[i], ncside);
     }
 }
 
