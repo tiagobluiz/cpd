@@ -17,6 +17,8 @@ int NUMBER_OF_PROCESSES;
 long NCSIDE, MAX_BLOCK_SIZE=0;
 
 MPI_Op reduceCellOp;
+MPI_Op reduceOverallCellOp;
+MPI_Datatype cellMPIType;
 MPI_Datatype particleMPIType;
 
 
@@ -106,7 +108,7 @@ void clean_cells(cell * cells, long ncside){
  * @return Matrix of cells and update the matrix coordenates of each particle
  */
 cell * create_grid(particle_t * particles, long long length, long ncside){
-    for(int i = 0; i < length; i++){
+    for(long i = 0; i < length; i++){
         update_particle(&particles[i], ncside);
     }
 }
@@ -135,7 +137,7 @@ void reduceCellsMatrix (cell * in, cell * out, int *len , MPI_Datatype *datatype
  * @param ncside        sides of the grid (how many rows the grid has)
  * @param process_id    id of the process
  */
-void compute_cell_center_mass(particle_t *particles, long length, cell * cells, long ncside, int process_id, MPI_Datatype datatype) { 
+void compute_cell_center_mass(particle_t *particles, long length, cell * cells, long ncside, int process_id) { 
     cell * cellLocalMatrix = (cell*) calloc(ncside * ncside, sizeof(cell));
     clean_cells(cells, ncside);
     //cell cellLocalMatrix[ncside * ncside];
@@ -165,7 +167,7 @@ void compute_cell_center_mass(particle_t *particles, long length, cell * cells, 
     //}
 
 
-    MPI_Allreduce(cellLocalMatrix, cells, ncside * ncside, datatype, reduceCellOp, MPI_COMM_WORLD);
+    MPI_Allreduce(cellLocalMatrix, cells, ncside * ncside, cellMPIType, reduceCellOp, MPI_COMM_WORLD);
 
 
     for (long cellIndex = 0; cellIndex < ncside * ncside; cellIndex++){
@@ -307,9 +309,9 @@ void compute_force_and_update_particles(particle_t *particles, int particles_len
 }
 
 void reduceOverallCellsMatrix (cell * in, cell * out, int *len , MPI_Datatype *datatype){
-    out->x = in->x;
-    out->y = in->y;
-    out->m = in->m;
+    out->x += in->x;
+    out->y += in->y;
+    out->m += in->m;
 }
 
 
@@ -319,9 +321,9 @@ void reduceOverallCellsMatrix (cell * in, cell * out, int *len , MPI_Datatype *d
  * @param particles     array of particles that compose the grid
  * @param length        number of particles (must match @particles length)
  */
-void compute_overall_center_mass(particle_t * particles, long length){
+void compute_overall_center_mass(particle_t * particles, long length, int process_id){
     cell overallCenterMass = {.x=0, .y=0, .m=0};
-    
+
     for (long particleIndex = 0; particleIndex < length; particleIndex++){
         overallCenterMass.x += particles[particleIndex].x * particles[particleIndex].m;
         overallCenterMass.y += particles[particleIndex].y * particles[particleIndex].m;
@@ -329,12 +331,15 @@ void compute_overall_center_mass(particle_t * particles, long length){
     }
 
     cell outOverallCenterMass = {.x=0, .y=0, .m=0};
+    printf("Process id: %d  |  %0.2f %0.2f %0.2f \n", process_id, overallCenterMass.x, overallCenterMass.y, overallCenterMass.m);
 
-    overallCenterMass.x /= overallCenterMass.m;
-    overallCenterMass.y /= overallCenterMass.m;
+    MPI_Reduce(&overallCenterMass, &outOverallCenterMass, 1, cellMPIType, reduceOverallCellOp, 0, MPI_COMM_WORLD);
 
+    outOverallCenterMass.x /= outOverallCenterMass.m;
+    outOverallCenterMass.y /= outOverallCenterMass.m;
 
-    printf("%0.2f %0.2f \n", overallCenterMass.x, overallCenterMass.y);
+    if(process_id == 0)
+        printf("%0.2f %0.2f \n", outOverallCenterMass.x, outOverallCenterMass.y);
 }
 
 void mapCellToMPI(MPI_Datatype * newType){
@@ -373,9 +378,9 @@ int main(int args_length, char* args[]) {
 
     //Type & Operations Setup
     MPI_Op_create(reduceCellsMatrix, 1, &reduceCellOp);
-    MPI_Datatype cellMPIType;
     mapCellToMPI(&cellMPIType);
     mapParticleToMPI(&particleMPIType);
+    MPI_Op_create(reduceOverallCellsMatrix, 1, &reduceOverallCellOp);
 
     cell * cellMatrix = (cell*) calloc(ncside * ncside, sizeof(cell));
 
@@ -398,7 +403,7 @@ int main(int args_length, char* args[]) {
     }*/
     
     for(int i = 0; i < iterations; i++){
-        compute_cell_center_mass(particles, n_part, cellMatrix, ncside, me, cellMPIType);
+        compute_cell_center_mass(particles, n_part, cellMatrix, ncside, me);
         compute_force_and_update_particles(particles, n_part, cellMatrix, ncside, me);  
         //for(int i = 0; i < n_part; i++){
         //    printf("%d Process | Particle %d %0.2f %0.2f\n", me, i, particles[0].x, particles[0].y);
@@ -408,8 +413,8 @@ int main(int args_length, char* args[]) {
 
     if(me==0){
         printf("%0.2f %0.2f \n", particles[0].x, particles[0].y);
-        //compute_overall_center_mass(particles, n_part);
     }
+    compute_overall_center_mass(particles, n_part, me);
 
     MPI_Finalize();
 
