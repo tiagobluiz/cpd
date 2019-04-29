@@ -123,7 +123,6 @@ void reduceCellsMatrix (cell * in, cell * out, int *len , MPI_Datatype *datatype
             out[cellIndex].y += in[cellIndex].y;
             out[cellIndex].m += in[cellIndex].m;
     }
-    free(in);
 }
 
 
@@ -139,6 +138,8 @@ void reduceCellsMatrix (cell * in, cell * out, int *len , MPI_Datatype *datatype
 void compute_cell_center_mass(particle_t *particles, long length, cell * cells, long ncside, int process_id, MPI_Datatype datatype) { 
     cell * cellLocalMatrix = (cell*) calloc(ncside * ncside, sizeof(cell));
     clean_cells(cells, ncside);
+    //cell cellLocalMatrix[ncside * ncside];
+    //memcpy(cellLocalMatrix, cells, ncside * ncside);
 
     for(long particleIndex = BLOCK_LOW(process_id, NUMBER_OF_PROCESSES, length); 
             particleIndex < BLOCK_SIZE(process_id, NUMBER_OF_PROCESSES, length); 
