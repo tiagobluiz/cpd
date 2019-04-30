@@ -306,6 +306,12 @@ void compute_force_and_update_particles(particle_t *particles, int particles_len
         //update the particle position
         update_particle_position(&particles[particleIndex], Fx, Fy, ncside);     
     }
+    //for(long i = BLOCK_LOW(process_id, NUMBER_OF_PROCESSES, particles_length); 
+    //        i <= BLOCK_HIGH(process_id, NUMBER_OF_PROCESSES, particles_length); 
+    //        i++)
+    //    printf("Process id: %d | Particula %d | %0.2f %0.2f %0.2f \n", process_id, i, particles[i].x, particles[i].y, particles[i].m);
+    
+
 }
 
 void reduceOverallCellsMatrix (cell * in, cell * out, int *len , MPI_Datatype *datatype){
@@ -318,20 +324,22 @@ void reduceOverallCellsMatrix (cell * in, cell * out, int *len , MPI_Datatype *d
 /**
  * Computes the center mass for each existing cell in grid
  *
- * @param particles     array of particles that compose the grid
- * @param length        number of particles (must match @particles length)
+ * @param particles               array of particles that compose the grid
+ * @param particles_length        number of particles (must match @particles length)
  */
-void compute_overall_center_mass(particle_t * particles, long length, int process_id){
+void compute_overall_center_mass(particle_t * particles, long particles_length, int process_id){
     cell overallCenterMass = {.x=0, .y=0, .m=0};
 
-    for (long particleIndex = 0; particleIndex < length; particleIndex++){
+    for (long particleIndex = BLOCK_LOW(process_id, NUMBER_OF_PROCESSES, particles_length); 
+            particleIndex <= BLOCK_HIGH(process_id, NUMBER_OF_PROCESSES, particles_length); 
+            particleIndex++){
         overallCenterMass.x += particles[particleIndex].x * particles[particleIndex].m;
         overallCenterMass.y += particles[particleIndex].y * particles[particleIndex].m;
         overallCenterMass.m += particles[particleIndex].m;
     }
 
     cell outOverallCenterMass = {.x=0, .y=0, .m=0};
-    printf("Process id: %d  |  %0.2f %0.2f %0.2f \n", process_id, overallCenterMass.x, overallCenterMass.y, overallCenterMass.m);
+    //printf("Process id: %d  |  %0.2f %0.2f %0.2f \n", process_id, overallCenterMass.x, overallCenterMass.y, overallCenterMass.m);
 
     MPI_Reduce(&overallCenterMass, &outOverallCenterMass, 1, cellMPIType, reduceOverallCellOp, 0, MPI_COMM_WORLD);
 
