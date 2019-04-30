@@ -120,7 +120,8 @@ cell * create_grid(particle_t * particles, long long length, long ncside){
  * @param b     incoming array, which will be deallocated from memory
  */
 void reduceCellsMatrix (cell * in, cell * out, int *len , MPI_Datatype *datatype){
-    for (long cellIndex = 0; cellIndex < NCSIDE * NCSIDE; cellIndex++){
+    //printf("REduce cell metrix entrou ----------------\n");
+    for (long cellIndex = 0; cellIndex < *len; cellIndex++){
             out[cellIndex].x += in[cellIndex].x;
             out[cellIndex].y += in[cellIndex].y;
             out[cellIndex].m += in[cellIndex].m;
@@ -168,6 +169,10 @@ void compute_cell_center_mass(particle_t *particles, long length, cell * cells, 
 
 
     MPI_Allreduce(cellLocalMatrix, cells, ncside * ncside, cellMPIType, reduceCellOp, MPI_COMM_WORLD);
+
+     
+    //printf("Process id: %d |Reduce done \n", process_id);
+   
 
 
     for (long cellIndex = 0; cellIndex < ncside * ncside; cellIndex++){
