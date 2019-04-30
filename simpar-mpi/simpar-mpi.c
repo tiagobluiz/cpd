@@ -72,6 +72,8 @@ particle_list * rmvList( particle_list * list, particle_t * particle){
         curr = curr->next;
     }
 
+    //TODO e se curr == NULL?
+
     curr->next->prev = curr->prev;
     curr->prev->next = curr->next;
 
@@ -94,13 +96,19 @@ particle_list * addList( particle_list * list, particle_t * particle){
  * @param particle  A pointer to a particle
  * @param ncside    The number of cells on each side of the matrix of cells
  */
-void update_particle(particle_t *particle, cell * cell, long ncside, int processId){
-    long cellIndex = particle->cellX * ncside + particle->cellY;
+void update_particle(particle_t *particle, cell * cells, long ncside, int processId){
     //Verifies if this cell belongs to this processor
-    if(!(cellIndex >= BLOCK_LOW(processId, NUMBER_OF_PROCESSES, ncside * ncside) &&
-        cellIndex <= BLOCK_HIGH(processId, NUMBER_OF_PROCESSES, ncside * ncside))) return;
+    long oldCellIndex = particle->cellX * ncside + particle->cellY; //TODO use this to verify the need to remove; The structures may neeed to be initialized in another way??
+    double sizeCell = MAX_COORDINATES_VALUE/NCSIDE;
+    long newCellX = particle->x/sizeCell;
+    long newCellY = particle->y/sizeCell;
+    long cellIndex = newCellX * ncside + newCellY;
 
-    addList( cell[cellIndex].particles, particle );
+    //TODO: O que fazer quando a particula se moveu para fora do nosso processo?
+    if(!(cellIndex >= BLOCK_LOW(processId, NUMBER_OF_PROCESSES, ncside * ncside) &&
+         cellIndex <= BLOCK_HIGH(processId, NUMBER_OF_PROCESSES, ncside * ncside))) return;
+
+    addList( cells[cellIndex].particles, particle ); // TODO E se já lá estiver, estamos a tirar e a pôr
 }
 
 /**
@@ -140,26 +148,24 @@ void clean_cells(cell * cells, long ncside){
  * @return Matrix of cells and update the matrix coordenates of each particle
  */
 cell * create_grid(particle_t * particles, long long numberOfParticles, cell * cells, long ncside, int processId){
-    for (long cellIndex = 0; cellIndex < ncside * ncside; cellIndex++)
+    for (long cellIndex = BLOCK_LOW(processId, NUMBER_OF_PROCESSES, ncside * ncside);
+            cellIndex <= BLOCK_HIGH(processId, NUMBER_OF_PROCESSES, ncside * ncside); cellIndex++)
         cells[cellIndex].particles = (particle_list *) calloc(1, sizeof(particle_list));
 
     for(long particleIndex = 0; particleIndex < numberOfParticles; particleIndex++){
-        update_particle(&particles[particleIndex], ncside, processId);
+        update_particle(&particles[particleIndex], cells, ncside, processId);
     }
 }
 
 /**
- * Reduces two arrays of cells into one (reduction function of redcell)
+ * Sends a row to another process
  *
- * @param a     accumulated array
- * @param b     incoming array, which will be deallocated from memory
+ * @param
+ * @param
+ * @param
  */
-void reduceCellsMatrix (cell * in, cell * out, int *len , MPI_Datatype *datatype){
-    for (long cellIndex = 0; cellIndex < NCSIDE * NCSIDE; cellIndex++){
-            out[cellIndex].x += in[cellIndex].x;
-            out[cellIndex].y += in[cellIndex].y;
-            out[cellIndex].m += in[cellIndex].m;
-    }
+void sendGhostRow (cell * row, int senderProcessId, int receiverProcessId){
+    //TODO yet
 }
 
 
@@ -202,10 +208,8 @@ void compute_cell_center_mass(particle_t *particles, long length, cell * cells, 
     //}
 
 
-    MPI_Allreduce(cellLocalMatrix, cells, ncside * ncside, cellMPIType, reduceCellOp, MPI_COMM_WORLD);
-
-
-    for (long cellIndex = 0; cellIndex < ncside * ncside; cellIndex++){
+    for (long cellIndex = BLOCK_LOW(processId, NUMBER_OF_PROCESSES, length);
+            cellIndex < BLOCK_HIGH(processId, NUMBER_OF_PROCESSES, length); cellIndex++){
         cells[cellIndex].x /= cells[cellIndex].m;
         cells[cellIndex].y /= cells[cellIndex].m;
     }
@@ -238,8 +242,11 @@ double compute_magnitude_force(particle_t * a, cell * b) {
  * @param particle  particle being updated
  * @param Fx        Force in axis X
  * @param Fy        Force in axis Y
+ * @param cells     Cells matrix
+ * @param ncside    number of rows/columns of the matrix
+ * @param processId ID of the current process
  */
-void update_particle_position(particle_t * particle, double Fx, double Fy, long ncside){
+void update_particle_position(particle_t * particle, double Fx, double Fy, cell * cells, long ncside, int processId){
     double acceleration_x = Fx/particle->m;
     double acceleration_y = Fy/particle->m;
     particle->vx += acceleration_x;
@@ -251,7 +258,9 @@ void update_particle_position(particle_t * particle, double Fx, double Fy, long 
     particle->x = x < 0 ? x + MAX_COORDINATES_VALUE : x;
     particle->y = y < 0 ? y + MAX_COORDINATES_VALUE : y;
 
-    update_particle(particle, ncside);
+
+    rmvList(cells[particle->cellX * ncside + particle->cellY].particles, particle);             // Removes the particle from the current cell
+    update_particle(particle, cells, ncside, processId);
 }
 
 /**
@@ -339,7 +348,7 @@ void compute_force_and_update_particles(particle_t *particles, int particles_len
         }
 
         //update the particle position
-        update_particle_position(&particles[particleIndex], Fx, Fy, ncside);     
+        update_particle_position(&particles[particleIndex], Fx, Fy, ncside);
     }
 }
 
@@ -428,7 +437,7 @@ int main(int args_length, char* args[]) {
 
 
     //printf("npart %d\n", n_part);
-    MPI_Bcast(cellMatrix, ncside * ncside, cellMPIType, 0, MPI_COMM_WORLD);
+//    MPI_Bcast(cellMatrix, ncside * ncside, cellMPIType, 0, MPI_COMM_WORLD); Each processor has its own partition of the cells matrix
     MPI_Bcast(particles, n_part, particleMPIType, 0, MPI_COMM_WORLD);    
 
     //for(int i = 0; i < n_part; i++)
