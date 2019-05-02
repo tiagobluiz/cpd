@@ -8,7 +8,7 @@
 #define G 6.67408e-11
 #define EPSLON 0.0005
 #define MAX_COORDINATES_VALUE 1.0
-#define NUMBER_OF_GHOST_ROWS 2
+#define NUMBER_OF_GHOST_ROWS 2 //Não pode ser por define (e se numero de colunas/processadores <  NUMBER_OF_GHOST_ROWS ?? não permite alteração
 
 #define BLOCK_LOW(id,p,n)  ((id)*(n)/(p))
 #define BLOCK_HIGH(id,p,n) (BLOCK_LOW((id)+1,p,n)-1)
@@ -20,9 +20,9 @@
 #define ROWS_NUMBER(id,p,n) (ENDING_ROW(id,p,n)-STARTING_ROW(id,p,n)+1)
 
 
-#define STARTING_ROW_IDX(id,p,n,s) BLOCK_LOW(id,p,n)/s * s
-#define ENDING_ROW_IDX(id,p,n,s) (STARTING_ROW((id+1),p,n,s)-1) * s
-#define NUMBER_OF_ELEMENTS(id,p,n,s) (ENDING_ROW_IDX(id,p,n,s)-STARTING_ROW_IDX(id,p,n,s)+1) // TODO #wrong
+#define STARTING_ROW_IDX(id,p,n,s) BLOCK_LOW(id,p,n)
+#define ENDING_ROW_IDX(id,p,n,s) BLOCK_HIGH(id,p,n)//ENDING_ROW((id),p,n,s) * s
+#define NUMBER_OF_ELEMENTS(id,p,n,s) BLOCK_SIZE(id,p,n)//(ENDING_ROW_IDX(id,p,n,s)-STARTING_ROW_IDX(id,p,n,s)+1) // TODO #wrong
 
 
 int NUMBER_OF_PROCESSES;
@@ -220,27 +220,27 @@ void exchangeGhostRows (cell * cells, long ncside, int senderProcessId, cell *  
     MPI_Irecv(&bottomProcessRow, ncside * NUMBER_OF_GHOST_ROWS, cellMPIType, bottomProcessId,
               SEND_GHOST_ROW_TAG, MPI_COMM_WORLD, &requests[1]);
 
-    MPI_Isend(&cells[NUMBER_OF_ELEMENTS(senderProcessId, NUMBER_OF_PROCESSES, ncside * ncside, ncside) - (ncside * NUMBER_OF_GHOST_ROWS * 2)],
+    MPI_Isend(&cells[NUMBER_OF_ELEMENTS(senderProcessId, NUMBER_OF_PROCESSES, ncside * ncside, ncside) + (ncside * NUMBER_OF_GHOST_ROWS)],
             ncside * NUMBER_OF_GHOST_ROWS, cellMPIType, topProcessId, SEND_GHOST_ROW_TAG, MPI_COMM_WORLD, &requests[2]);
-    long x = NUMBER_OF_ELEMENTS(senderProcessId, NUMBER_OF_PROCESSES, ncside * ncside, ncside) - ncside * NUMBER_OF_GHOST_ROWS;
-    MPI_Isend(&cells[NUMBER_OF_ELEMENTS(senderProcessId, NUMBER_OF_PROCESSES, ncside * ncside, ncside) - ncside * NUMBER_OF_GHOST_ROWS],
+
+    MPI_Isend(&cells[NUMBER_OF_ELEMENTS(senderProcessId, NUMBER_OF_PROCESSES, ncside * ncside, ncside)],
               ncside * NUMBER_OF_GHOST_ROWS, cellMPIType, bottomProcessId, SEND_GHOST_ROW_TAG, MPI_COMM_WORLD, &requests[3]);
 
     // Ideally use the fact that a row is received to compute the movements on the received side (more parallelism = less time)
     MPI_Waitall(4, requests, statuses);
 
     // Check the status for a possible error TODO use the count and cancelled to check errors
-    for (int statusesIndex = 0; statusesIndex < 4; statusesIndex++)
-        printf("Sender Id: %d | Status index: %d | Cancelled: %d | Count: %d",
-               senderProcessId, statusesIndex, statuses[statusesIndex]._cancelled, statuses[statusesIndex]._ucount);
+//    for (int statusesIndex = 0; statusesIndex < 4; statusesIndex++)
+//        printf("Sender Id: %d | Status index: %d | Cancelled: %d | Count: %d",
+//               senderProcessId, statusesIndex, statuses[statusesIndex]._cancelled, statuses[statusesIndex]._ucount);
 
     /*
      * Copy the contents to the process' matrix
      *
      * NOTE: bottom ghost row goes right after the process data, whereas the top row goes after the bottom ghost row
      */
-    memcpy(&cells[NUMBER_OF_ELEMENTS(topProcessId, NUMBER_OF_PROCESSES, ncside * ncside, ncside) - (ncside * NUMBER_OF_PROCESSES)], topProcessRow, ncside * NUMBER_OF_GHOST_ROWS);
-    memcpy(&cells[NUMBER_OF_ELEMENTS(bottomProcessId, NUMBER_OF_PROCESSES, ncside * ncside, ncside) - (ncside * NUMBER_OF_PROCESSES * 2)], bottomProcessRow, ncside * NUMBER_OF_GHOST_ROWS);
+    memcpy(&cells[NUMBER_OF_ELEMENTS(topProcessId, NUMBER_OF_PROCESSES, ncside * ncside, ncside) + (ncside * NUMBER_OF_GHOST_ROWS)], topProcessRow, ncside * NUMBER_OF_GHOST_ROWS);
+    memcpy(&cells[NUMBER_OF_ELEMENTS(bottomProcessId, NUMBER_OF_PROCESSES, ncside * ncside, ncside) + (ncside * NUMBER_OF_GHOST_ROWS * 2)], bottomProcessRow, ncside * NUMBER_OF_GHOST_ROWS);
 }
 
 /**
