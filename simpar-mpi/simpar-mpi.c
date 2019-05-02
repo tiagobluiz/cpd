@@ -83,8 +83,6 @@ particle_list * rmvList( particle_list * list, particle_t * particle){
         curr = curr->next;
     }
 
-    //TODO e se curr == NULL?
-
     curr->next->prev = curr->prev;
     curr->prev->next = curr->next;
 
@@ -95,8 +93,8 @@ particle_list * addList( particle_list * list, particle_t * particle){
     particle_list *newOne = (particle_list *)malloc(sizeof(particle_list));
     newOne->particle = particle;
 
-    list->prev = newOne;
-    newOne->next = list;
+    list->next = newOne;
+    newOne->prev = list;
 
     return newOne;
 }
