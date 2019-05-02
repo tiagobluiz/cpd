@@ -93,8 +93,11 @@ particle_list * addList( particle_list * list, particle_t * particle){
     particle_list *newOne = (particle_list *)malloc(sizeof(particle_list));
     newOne->particle = particle;
 
-    list->next = newOne;
+    newOne->next = list.next;
     newOne->prev = list;
+    list->next = newOne;
+    if(newOne->next!=NULL)
+        newOne->next->prev = newOne;    
 
     return newOne;
 }
