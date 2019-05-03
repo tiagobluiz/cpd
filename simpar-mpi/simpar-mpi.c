@@ -120,13 +120,7 @@ void update_particle(particle_t *particle, cell * cells, long ncside, int proces
             globalCellIndex <= BLOCK_HIGH(processId, NUMBER_OF_PROCESSES, ncside * ncside))) return;
 
     int localCellIndex = globalCellIndex - BLOCK_LOW(processId, NUMBER_OF_PROCESSES, ncside * ncside);
-    addList( cells[localCellIndex].particles, particle );
-//    particle_list * currentParticleList = cells[localCellIndex].particles->next;
-//    while (currentParticleList != NULL) {
-//        printf("PID %d  CI %d|  PX %0.2f  PY %0.2f\n", processId, localCellIndex,
-//                currentParticleList->particle->x, currentParticleList->particle->y);
-//        currentParticleList = currentParticleList->next;
-//    }
+    addList( &cells[localCellIndex], particle );
 }
 
 /**
@@ -150,8 +144,8 @@ void move_particle(particle_t *particle, cell * cells, long ncside, int processI
 
     particle->cellX = newCellX;
     particle->cellY = newCellY;
-    rmvList( cells[oldCellIndex].particles, particle );
-    addList( cells[localCellIndex].particles, particle );
+    rmvList( &cells[oldCellIndex], particle );
+    addList( &cells[localCellIndex], particle );
 }
 
 /**
@@ -173,12 +167,8 @@ int mod (int dividend, int diviser){
  */
 void clean_cells(cell * cells, long ncside, int processId){
     for (long cellIndex = 0; cellIndex < NUMBER_OF_ELEMENTS(processId, NUMBER_OF_PROCESSES, ncside * ncside, ncside); cellIndex++){
-        long long toAlloc = cells[cellIndex].nParticles / 2;
-        realloc(cells[cellIndex].particles, toAlloc < 1 ? 1 : toAlloc);
         cells[cellIndex].x = cells[cellIndex].y =
-        cells[cellIndex].m = cells[cellIndex].nParticles = 0;
-        /*TODO decide if we should cut (at least) in half the allocated space for particles (at maximum if all particles move
-            from a cell to another, we will have all cells allocating memory for all particles */
+        cells[cellIndex].m = 0;
     }
 }
 
@@ -196,8 +186,11 @@ void clean_cells(cell * cells, long ncside, int processId){
  */
 cell * create_grid(particle_t * particles, long long numberOfParticles, cell * cells, long ncside, int processId){
     for (long cellIndex = 0;
-            cellIndex < NUMBER_OF_ELEMENTS(processId, NUMBER_OF_PROCESSES, ncside * ncside, ncside) + ncside * NUMBER_OF_GHOST_ROWS * 2; cellIndex++)
+            cellIndex < NUMBER_OF_ELEMENTS(processId, NUMBER_OF_PROCESSES, ncside * ncside, ncside)
+            + ncside * NUMBER_OF_GHOST_ROWS * 2; cellIndex++){
         cells[cellIndex].particles = (particle_list *) calloc(1, sizeof(particle_list));
+        cells[cellIndex].allocatedSpace = 1;
+    }
 
     for(long long particleIndex = 0; particleIndex < numberOfParticles; particleIndex++){
         update_particle(&particles[particleIndex], &cells[ncside * NUMBER_OF_GHOST_ROWS], ncside, processId);
