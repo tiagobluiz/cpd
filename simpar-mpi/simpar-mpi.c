@@ -39,8 +39,6 @@ typedef struct {
     double vx;
     double vy;
     double m;
-    long cellX;
-    long cellY;  
 }particle_t;
 
 typedef struct particle_list {
@@ -115,17 +113,17 @@ void update_particle(particle_t *particle, cell * cells, long ncside, int proces
     long newCellY = particle->y/sizeCell;
     long globalCellIndex = newCellX * ncside + newCellY;
 
-    if((globalCellIndex >= BLOCK_LOW(processId, NUMBER_OF_PROCESSES, ncside * ncside)) &&
-            (globalCellIndex <= BLOCK_HIGH(processId, NUMBER_OF_PROCESSES, ncside * ncside))){
-        int localCellIndex = globalCellIndex - BLOCK_LOW(processId, NUMBER_OF_PROCESSES, ncside * ncside);
-        addList( cells[localCellIndex].particles, particle, processId );
-        particle_list * currentParticleList = cells[localCellIndex].particles->next;
-        while (currentParticleList != NULL) {
-            printf("PID %d  CI %d|  PX %0.2f  PY %0.2f\n", processId, localCellIndex,
-                    currentParticleList->particle->x, currentParticleList->particle->y);
-            currentParticleList = currentParticleList->next;
-        }
-    }
+    if(!(globalCellIndex >= BLOCK_LOW(processId, NUMBER_OF_PROCESSES, ncside * ncside) &&
+            globalCellIndex <= BLOCK_HIGH(processId, NUMBER_OF_PROCESSES, ncside * ncside))) return;
+
+    int localCellIndex = globalCellIndex - BLOCK_LOW(processId, NUMBER_OF_PROCESSES, ncside * ncside);
+    addList( cells[localCellIndex].particles, particle, processId );
+//    particle_list * currentParticleList = cells[localCellIndex].particles->next;
+//    while (currentParticleList != NULL) {
+//        printf("PID %d  CI %d|  PX %0.2f  PY %0.2f\n", processId, localCellIndex,
+//                currentParticleList->particle->x, currentParticleList->particle->y);
+//        currentParticleList = currentParticleList->next;
+//    }
 }
 
 /**
@@ -517,23 +515,19 @@ void compute_overall_center_mass(cell * cells, long ncside, int processId){
         printf("%0.2f %0.2f \n", outOverallCenterMass.x, outOverallCenterMass.y);
 }
 
-
-//TODO alterar o metodo para a nova celula
 void mapCellToMPI(MPI_Datatype * newType){
     MPI_Type_contiguous(3, MPI_DOUBLE, newType);
     MPI_Type_commit(newType);
 }
 
-void mapParticleToMPI(MPI_Datatype * newType){
-    int blocklens[] = {5 /*doubles*/,2 /*long long*/};
-    MPI_Aint extent;
-    MPI_Type_extent(MPI_DOUBLE, &extent);
-    MPI_Aint indices[] = {0, 5 * extent /* we have 5 doubles */};
-    MPI_Datatype oldTypes[] = {MPI_DOUBLE, MPI_LONG};
-    MPI_Type_struct(2, blocklens, indices, oldTypes, newType);
-    MPI_Type_commit(newType);
+void mapParticleListToMPI(MPI_Datatype * newType){
+
 }
 
+void mapParticleToMPI(MPI_Datatype * newType){
+    MPI_Type_contiguous(5, MPI_DOUBLE, newType);
+    MPI_Type_commit(newType);
+}
 
 int main(int args_length, char* args[]) {
     if (args_length < 4) {
