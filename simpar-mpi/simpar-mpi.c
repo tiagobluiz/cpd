@@ -39,6 +39,8 @@ typedef struct {
     double vx;
     double vy;
     double m;
+    long cellX;
+    long cellY;
 }particle_t;
 
 typedef struct particle_list {
@@ -145,6 +147,8 @@ void move_particle(particle_t *particle, cell * cells, long ncside, int processI
          globalCellIndex == oldCellIndex)return;
     int localCellIndex = globalCellIndex - BLOCK_LOW(processId, NUMBER_OF_PROCESSES, ncside * ncside);
 
+    particle->cellX = newCellX;
+    particle->cellY = newCellY;
     rmvList( cells[oldCellIndex].particles, particle );
     addList( cells[localCellIndex].particles, particle, processId);
 }
@@ -525,7 +529,12 @@ void mapParticleListToMPI(MPI_Datatype * newType){
 }
 
 void mapParticleToMPI(MPI_Datatype * newType){
-    MPI_Type_contiguous(5, MPI_DOUBLE, newType);
+    int blocklens[] = {5 /*doubles*/,2 /*long long*/};
+    MPI_Aint extent;
+    MPI_Type_extent(MPI_DOUBLE, &extent);
+    MPI_Aint indices[] = {0, 5 * extent /* we have 5 doubles */};
+    MPI_Datatype oldTypes[] = {MPI_DOUBLE, MPI_LONG};
+    MPI_Type_struct(2, blocklens, indices, oldTypes, newType);
     MPI_Type_commit(newType);
 }
 
