@@ -220,11 +220,15 @@ cell * create_grid(particle_t * particles, long long numberOfParticles, cell * c
  * @param requests
  * @param statuses
  */
-void exchangeGhostRows (cell * cells, long ncside, int senderProcessId, cell *  topProcessRow, cell *  bottomProcessRow,  MPI_Request * requests, MPI_Status * statuses) {
+void exchangeGhostRows (cell * cells, long ncside, int senderProcessId) {
     if (NUMBER_OF_PROCESSES == 1) return; // If it is only one processor, there is no need for communication
 
     int topProcessId = (senderProcessId - 1 + NUMBER_OF_PROCESSES) % NUMBER_OF_PROCESSES;
     int bottomProcessId = (senderProcessId + 1 + NUMBER_OF_PROCESSES) % NUMBER_OF_PROCESSES;
+
+    printf("SENDER %d || TOP %d || BOT %d\n", senderProcessId, topProcessId, bottomProcessId);
+    MPI_Status statuses[2];
+    MPI_Request requests[2];
 
     cell * topGhostRow = (cells - (ncside * NUMBER_OF_GHOST_ROWS));
     cell * bottomGhostRow = &cells[NUMBER_OF_ELEMENTS(bottomProcessId, NUMBER_OF_PROCESSES, ncside * ncside, ncside)];
@@ -236,8 +240,9 @@ void exchangeGhostRows (cell * cells, long ncside, int senderProcessId, cell *  
 
     MPI_Send(cells, ncside * NUMBER_OF_GHOST_ROWS, cellMPIType, topProcessId, SEND_GHOST_ROW_TAG, MPI_COMM_WORLD);
 
-    MPI_Send(&cells[NUMBER_OF_ELEMENTS(senderProcessId, NUMBER_OF_PROCESSES, ncside * ncside, ncside) - ncside * NUMBER_OF_GHOST_ROWS],
-              ncside * NUMBER_OF_GHOST_ROWS, cellMPIType, bottomProcessId, SEND_GHOST_ROW_TAG, MPI_COMM_WORLD);
+    MPI_Send(&cells[NUMBER_OF_ELEMENTS(senderProcessId, NUMBER_OF_PROCESSES, ncside * ncside, ncside) -
+    (ncside * NUMBER_OF_GHOST_ROWS)],ncside * NUMBER_OF_GHOST_ROWS, cellMPIType, bottomProcessId,
+            SEND_GHOST_ROW_TAG, MPI_COMM_WORLD);
 
     // Ideally use the fact that a row is received to compute the movements on the received side (more parallelism = less time)
     MPI_Waitall(2, requests, statuses);
@@ -247,8 +252,12 @@ void exchangeGhostRows (cell * cells, long ncside, int senderProcessId, cell *  
 //        printf("Sender Id: %d | Status index: %d | Cancelled: %d | Count: %d\n",
 //               senderProcessId, statusesIndex, statuses[statusesIndex]._cancelled, statuses[statusesIndex]._ucount);
 
-//    printf("SID %d TOP||  X:%0.2f; Y:%0.2f; M:%0.2f\n", senderProcessId, topGhostRow[0].x,topGhostRow[0].y,topGhostRow[0].m);
-//    printf("SID %d BOT||  X:%0.2f; Y:%0.2f; M:%0.2f\n", senderProcessId, bottomGhostRow[0].x,bottomGhostRow[0].y,bottomGhostRow[0].m);
+    printf("SID %d TOP||  X:%0.2f; Y:%0.2f; M:%0.2f\n", senderProcessId, topGhostRow[0].x,topGhostRow[0].y,topGhostRow[0].m);
+    printf("SID %d BOT|| X:%0.2f; Y:%0.2f; M:%0.2f\n", senderProcessId,
+           bottomGhostRow[ncside * NUMBER_OF_GHOST_ROWS - 2].x,
+           bottomGhostRow[ncside * NUMBER_OF_GHOST_ROWS - 2].y,
+           bottomGhostRow[ncside * NUMBER_OF_GHOST_ROWS - 2].m);
+
 }
 
 /**
@@ -260,7 +269,7 @@ void exchangeGhostRows (cell * cells, long ncside, int senderProcessId, cell *  
  * @param ncside        sides of the grid (how many rows the grid has)
  * @param processId    id of the process
  */
-void compute_cell_center_mass(particle_t *particles, long length, cell * cells, long ncside, int processId) {
+void compute_cell_center_mass(cell * cells, long ncside, int processId) {
     clean_cells(cells, ncside, processId);
 
     for (long cellIndex = 0; cellIndex < NUMBER_OF_ELEMENTS(processId, NUMBER_OF_PROCESSES, ncside * ncside, ncside);
@@ -280,16 +289,11 @@ void compute_cell_center_mass(particle_t *particles, long length, cell * cells, 
 
     printf("PID %d TOP|| X:%0.2f; Y:%0.2f; M:%0.2f\n", processId, cells[0].x,cells[0].y,cells[0].m);
     printf("PID %d BOT|| X:%0.2f; Y:%0.2f; M:%0.2f\n", processId,
-            cells[NUMBER_OF_ELEMENTS(processId, NUMBER_OF_PROCESSES, ncside * ncside, ncside)-1].x,
-            cells[NUMBER_OF_ELEMENTS(processId, NUMBER_OF_PROCESSES, ncside * ncside, ncside)-1].y,
-            cells[NUMBER_OF_ELEMENTS(processId, NUMBER_OF_PROCESSES, ncside * ncside, ncside)-1].m);
+            cells[NUMBER_OF_ELEMENTS(processId, NUMBER_OF_PROCESSES, ncside * ncside, ncside)-2].x,
+            cells[NUMBER_OF_ELEMENTS(processId, NUMBER_OF_PROCESSES, ncside * ncside, ncside)-2].y,
+            cells[NUMBER_OF_ELEMENTS(processId, NUMBER_OF_PROCESSES, ncside * ncside, ncside)-2].m);
 
-    cell topProcessRow, bottomProcessRow;
-    MPI_Status statuses[4];
-    MPI_Request requests[4];
-
-    exchangeGhostRows(cells, ncside, processId,
-            &topProcessRow, &bottomProcessRow, &requests[0], &statuses[0]);
+    exchangeGhostRows(cells, ncside, processId);
 }
 
 /**
@@ -591,7 +595,7 @@ int main(int args_length, char* args[]) {
 
     for(int i = 0; i < iterations; i++){
         //To simplify the index treatment (to start with 0) the cells matrix that goes through parameter omits the top ghost row
-        compute_cell_center_mass(particles, n_part, &cellMatrix[ncside * NUMBER_OF_GHOST_ROWS], ncside, rank);
+        compute_cell_center_mass(&cellMatrix[ncside * NUMBER_OF_GHOST_ROWS], ncside, rank);
 //        compute_force_and_update_particles(cellMatrix, ncside, rank);
     }
 
