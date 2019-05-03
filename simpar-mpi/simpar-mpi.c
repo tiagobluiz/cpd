@@ -272,15 +272,14 @@ void compute_cell_center_mass(particle_t *particles, long length, cell * cells, 
 
     for (long cellIndex = 0; cellIndex < NUMBER_OF_ELEMENTS(processId, NUMBER_OF_PROCESSES, ncside * ncside, ncside);
     cellIndex++){
-        particle_list * currentParticleList = cells[cellIndex].particles->next;
-        if(currentParticleList != NULL){ //avoid div by 0 after while
-            do {
-                particle_t * currentParticle = currentParticleList->particle;
+        cell currCell = cells[cellIndex];
+        if(currCell.nParticles > 0){ //avoid div by 0
+            for(long long particleIndex = 0; particleIndex < currCell.nParticles; particleIndex++) {
+                particle_t * currentParticle = currCell.particles[particleIndex];
                 cells[cellIndex].x += currentParticle->x * currentParticle->m;
                 cells[cellIndex].y += currentParticle->y * currentParticle->m;
                 cells[cellIndex].m += currentParticle->m;
-                currentParticleList = currentParticleList->next;
-            } while (currentParticleList != NULL);
+            }
             cells[cellIndex].x /= cells[cellIndex].m;
             cells[cellIndex].y /= cells[cellIndex].m;
         }
