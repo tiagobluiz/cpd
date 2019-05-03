@@ -43,19 +43,13 @@ typedef struct {
     long cellY;
 }particle_t;
 
-typedef struct particle_list {
-    struct particle_list * prev;
-    struct particle_list * next;
-    particle_t * particle;
-}particle_list;
-
 typedef struct {
     double x;
     double y;
     double m;
-    particle_t ** particles;
     long long nParticles;
     long long allocatedSpace;
+    particle_t ** particles;
 }cell;
 
 /**
@@ -188,7 +182,7 @@ cell * create_grid(particle_t * particles, long long numberOfParticles, cell * c
     for (long cellIndex = 0;
             cellIndex < NUMBER_OF_ELEMENTS(processId, NUMBER_OF_PROCESSES, ncside * ncside, ncside)
             + ncside * NUMBER_OF_GHOST_ROWS * 2; cellIndex++){
-        cells[cellIndex].particles = (particle_list *) calloc(1, sizeof(particle_list));
+        cells[cellIndex].particles = calloc(1, sizeof(particle_t));
         cells[cellIndex].allocatedSpace = 1;
     }
 
@@ -244,19 +238,21 @@ void exchangeGhostRows (cell * cells, long ncside, int senderProcessId) {
     (ncside * NUMBER_OF_GHOST_ROWS)],ncside * NUMBER_OF_GHOST_ROWS, cellMPIType, bottomProcessId,
             SEND_GHOST_ROW_TAG, MPI_COMM_WORLD);
 
-    // Ideally use the fact that a row is received to compute the movements on the received side (more parallelism = less time)
+    // Ideally, use the fact that a row is received to compute the movements on the received side (more parallelism = less time)
     MPI_Waitall(2, requests, statuses);
+
+
 
     // Check the status for a possible error TODO use the count and cancelled to check errors
 //    for (int statusesIndex = 0; statusesIndex < 2; statusesIndex++)
 //        printf("Sender Id: %d | Status index: %d | Cancelled: %d | Count: %d\n",
 //               senderProcessId, statusesIndex, statuses[statusesIndex]._cancelled, statuses[statusesIndex]._ucount);
 
-    printf("SID %d TOP||  X:%0.2f; Y:%0.2f; M:%0.2f\n", senderProcessId, topGhostRow[0].x,topGhostRow[0].y,topGhostRow[0].m);
-    printf("SID %d BOT|| X:%0.2f; Y:%0.2f; M:%0.2f\n", senderProcessId,
-           bottomGhostRow[ncside * NUMBER_OF_GHOST_ROWS - 2].x,
-           bottomGhostRow[ncside * NUMBER_OF_GHOST_ROWS - 2].y,
-           bottomGhostRow[ncside * NUMBER_OF_GHOST_ROWS - 2].m);
+//    printf("SID %d TOP||  X:%0.2f; Y:%0.2f; M:%0.2f\n", senderProcessId, topGhostRow[1].x,topGhostRow[1].y,topGhostRow[1].m);
+//    printf("SID %d BOT|| X:%0.2f; Y:%0.2f; M:%0.2f\n", senderProcessId,
+//           bottomGhostRow[ncside * NUMBER_OF_GHOST_ROWS - 2].x,
+//           bottomGhostRow[ncside * NUMBER_OF_GHOST_ROWS - 2].y,
+//           bottomGhostRow[ncside * NUMBER_OF_GHOST_ROWS - 2].m);
 
 }
 
@@ -287,11 +283,11 @@ void compute_cell_center_mass(cell * cells, long ncside, int processId) {
         }
     }
 
-    printf("PID %d TOP|| X:%0.2f; Y:%0.2f; M:%0.2f\n", processId, cells[0].x,cells[0].y,cells[0].m);
-    printf("PID %d BOT|| X:%0.2f; Y:%0.2f; M:%0.2f\n", processId,
-            cells[NUMBER_OF_ELEMENTS(processId, NUMBER_OF_PROCESSES, ncside * ncside, ncside)-2].x,
-            cells[NUMBER_OF_ELEMENTS(processId, NUMBER_OF_PROCESSES, ncside * ncside, ncside)-2].y,
-            cells[NUMBER_OF_ELEMENTS(processId, NUMBER_OF_PROCESSES, ncside * ncside, ncside)-2].m);
+//    printf("PID %d TOP|| X:%0.2f; Y:%0.2f; M:%0.2f\n", processId, cells[1].x,cells[1].y,cells[1].m);
+//    printf("PID %d BOT|| X:%0.2f; Y:%0.2f; M:%0.2f\n", processId,
+//            cells[NUMBER_OF_ELEMENTS(processId, NUMBER_OF_PROCESSES, ncside * ncside, ncside)-2].x,
+//            cells[NUMBER_OF_ELEMENTS(processId, NUMBER_OF_PROCESSES, ncside * ncside, ncside)-2].y,
+//            cells[NUMBER_OF_ELEMENTS(processId, NUMBER_OF_PROCESSES, ncside * ncside, ncside)-2].m);
 
     exchangeGhostRows(cells, ncside, processId);
 }
@@ -398,43 +394,42 @@ cell * get_cell(long long unbounded_row, long long unbounded_column, cell *cells
 void compute_force_and_update_particles(cell *cells, long ncside, int processId){
     for(long cellIndex = 0;
             cellIndex < NUMBER_OF_ELEMENTS(processId, NUMBER_OF_PROCESSES, ncside * ncside, ncside); cellIndex++) {
-        particle_list *cellParticles = cells[cellIndex].particles;
-        cell neighboursList[9];
+        cell currCell = cells[cellIndex];
 
         long cellX = ceil(cellIndex / ncside);
         long cellY = cellIndex % ncside;
 
-        //resultant force in X and Y
-        double Fx = 0;
-        double Fy = 0;
-
+        //Obtain the neighbours of the particles of this cell
+        cell neighboursList[9];
         int neighboursListIndex = 0;
         for (int row = -1; row < 2; row++) {
             for (int column = -1; column < 2; column++) {
                 get_cell(row + cellX, column + cellY, cells, &neighboursList[neighboursListIndex++], ncside);
             }
+        }
 
-            while (cellParticles->next != 0) {
-                particle_t *currentParticle = cellParticles->particle;
-                for (neighboursListIndex = 0; neighboursListIndex < 9; neighboursListIndex++) {
-                    //if that cell doesn't have any particle, no central mass will exist, so we ignore
-                    if (neighboursList[neighboursListIndex].m == 0)
-                        continue;
+        for(long long particleIndex = 0; particleIndex < currCell.nParticles; particleIndex++) {
+            particle_t *currentParticle = currCell.particles[particleIndex];
+            //resultant force in X and Y
+            double Fx = 0;
+            double Fy = 0;
 
-                    //compute angle
-                    double delta_x = neighboursList[neighboursListIndex].x - currentParticle->x;
-                    double delta_y = neighboursList[neighboursListIndex].y - currentParticle->y;
-                    double vector_angle = atan2(delta_y, delta_x);
+            for (neighboursListIndex = 0; neighboursListIndex < 9; neighboursListIndex++) {
+                //if that cell doesn't have any particle, no central mass will exist, so we ignore
+                if (neighboursList[neighboursListIndex].nParticles == 0)
+                    continue;
 
-                    //compute force
-                    double force = compute_magnitude_force(currentParticle, &neighboursList[neighboursListIndex]);
-                    Fx += force * cos(vector_angle);
-                    Fy += force * sin(vector_angle);
-                }
+                //compute angle
+                double delta_x = neighboursList[neighboursListIndex].x - currentParticle->x;
+                double delta_y = neighboursList[neighboursListIndex].y - currentParticle->y;
+                double vector_angle = atan2(delta_y, delta_x);
 
-                update_particle_position(currentParticle, Fx, Fy, cells, ncside, processId);
-                cellParticles = cellParticles->next;
+                //compute force
+                double force = compute_magnitude_force(currentParticle, &neighboursList[neighboursListIndex]);
+                Fx += force * cos(vector_angle);
+                Fy += force * sin(vector_angle);
             }
+            update_particle_position(currentParticle, Fx, Fy, cells, ncside, processId);
         }
     }
 
@@ -499,12 +494,12 @@ void compute_overall_center_mass(cell * cells, long ncside, int processId){
 
     for(long cellIndex = 0; cellIndex < NUMBER_OF_ELEMENTS(processId, NUMBER_OF_PROCESSES, ncside * ncside, ncside);
     cellIndex++) {
-        particle_list * currentParticleList = cells[cellIndex].particles;
-        while (currentParticleList->particle != 0){
-            particle_t * currentParticle = currentParticleList->particle;
-            overallCenterMass.x += currentParticle->x * currentParticle->m;
-            overallCenterMass.y += currentParticle->y * currentParticle->m;
-            overallCenterMass.m += currentParticle->m;
+        particle_t * currentParticleList = cells[cellIndex].particles;
+        for(long long particleIndex = 0; particleIndex < cells[cellIndex].nParticles; particleIndex++) {
+            particle_t currentParticle = currentParticleList[particleIndex];
+            overallCenterMass.x += currentParticle.x * currentParticle.m;
+            overallCenterMass.y += currentParticle.y * currentParticle.m;
+            overallCenterMass.m += currentParticle.m;
         }
     }
 
@@ -521,16 +516,17 @@ void compute_overall_center_mass(cell * cells, long ncside, int processId){
 }
 
 void mapCellToMPI(MPI_Datatype * newType){
-    MPI_Type_contiguous(3, MPI_DOUBLE, newType);
+    int blocklens[] = {3 /*doubles*/,2 /*long long*/};
+    MPI_Aint extent;
+    MPI_Type_extent(MPI_DOUBLE, &extent);
+    MPI_Aint indices[] = {0, 3 * extent /* we have 5 doubles */};
+    MPI_Datatype oldTypes[] = {MPI_DOUBLE, MPI_LONG_LONG};
+    MPI_Type_struct(2, blocklens, indices, oldTypes, newType);
     MPI_Type_commit(newType);
 }
 
-void mapParticleListToMPI(MPI_Datatype * newType){
-
-}
-
 void mapParticleToMPI(MPI_Datatype * newType){
-    int blocklens[] = {5 /*doubles*/,2 /*long long*/};
+    int blocklens[] = {5 /*doubles*/,2 /*long*/};
     MPI_Aint extent;
     MPI_Type_extent(MPI_DOUBLE, &extent);
     MPI_Aint indices[] = {0, 5 * extent /* we have 5 doubles */};
