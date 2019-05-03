@@ -120,7 +120,7 @@ void update_particle(particle_t *particle, cell * cells, long ncside, int proces
             globalCellIndex <= BLOCK_HIGH(processId, NUMBER_OF_PROCESSES, ncside * ncside))) return;
 
     int localCellIndex = globalCellIndex - BLOCK_LOW(processId, NUMBER_OF_PROCESSES, ncside * ncside);
-    addList( cells[localCellIndex].particles, particle, processId );
+    addList( cells[localCellIndex].particles, particle );
 //    particle_list * currentParticleList = cells[localCellIndex].particles->next;
 //    while (currentParticleList != NULL) {
 //        printf("PID %d  CI %d|  PX %0.2f  PY %0.2f\n", processId, localCellIndex,
@@ -151,7 +151,7 @@ void move_particle(particle_t *particle, cell * cells, long ncside, int processI
     particle->cellX = newCellX;
     particle->cellY = newCellY;
     rmvList( cells[oldCellIndex].particles, particle );
-    addList( cells[localCellIndex].particles, particle, processId);
+    addList( cells[localCellIndex].particles, particle );
 }
 
 /**
