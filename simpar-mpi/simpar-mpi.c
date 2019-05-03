@@ -53,7 +53,9 @@ typedef struct {
     double x;
     double y;
     double m;
-    particle_list * particles;
+    particle_t ** particles;
+    long long nParticles;
+    long long allocatedSpace;
 }cell;
 
 /**
@@ -77,29 +79,28 @@ void init_particles(long seed, long ncside, long long n_part, particle_t *par)
     }
 }
 
-particle_list * rmvList( particle_list * list, particle_t * particle){
-    particle_list * curr = list;
-    while(curr->particle != particle && curr != NULL){
-        curr = curr->next;
+void rmvList( cell * cell, particle_t * particle){
+    for(long long particleIndex = 0; particleIndex < cell->nParticles; particleIndex++) {
+        if(cell->particles[particleIndex] != particle) continue;//if same pointer
+        memmove(cell, (cell + 1), cell->nParticles - particleIndex);
+        cell->nParticles--;
+
+        // If we are only using 1/3 of the space, we can realloc to use less space (just cut at half to allow some movement)
+        if(cell->nParticles < cell->allocatedSpace/3){
+            cell->allocatedSpace /= 2;
+            realloc(cell->particles, cell->allocatedSpace);
+        }
+        return;
     }
-
-    curr->next->prev = curr->prev;
-    curr->prev->next = curr->next;
-
-    return curr;
 }
 
-particle_list * addList( particle_list * list, particle_t * particle, int procId){
-    particle_list *newOne = (particle_list *)malloc(sizeof(particle_list));
-    newOne->particle = particle;
-
-    newOne->next = list->next;
-    newOne->prev = list;
-    list->next = newOne;
-    if(newOne->next!=NULL)
-        newOne->next->prev = newOne;    
-
-    return newOne;
+void * addList(cell * cell, particle_t * particle){
+    if( cell->nParticles > cell->allocatedSpace ){
+        cell->allocatedSpace *=2;
+        realloc(cell->particles, cell->allocatedSpace);
+    }
+    cell->particles[cell->nParticles] = particle;
+    cell->nParticles++;
 }
 
 /**
@@ -172,8 +173,12 @@ int mod (int dividend, int diviser){
  */
 void clean_cells(cell * cells, long ncside, int processId){
     for (long cellIndex = 0; cellIndex < NUMBER_OF_ELEMENTS(processId, NUMBER_OF_PROCESSES, ncside * ncside, ncside); cellIndex++){
+        long long toAlloc = cells[cellIndex].nParticles / 2;
+        realloc(cells[cellIndex].particles, toAlloc < 1 ? 1 : toAlloc);
         cells[cellIndex].x = cells[cellIndex].y =
-        cells[cellIndex].m = 0;
+        cells[cellIndex].m = cells[cellIndex].nParticles = 0;
+        /*TODO decide if we should cut (at least) in half the allocated space for particles (at maximum if all particles move
+            from a cell to another, we will have all cells allocating memory for all particles */
     }
 }
 
