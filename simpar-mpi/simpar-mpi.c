@@ -89,7 +89,7 @@ particle_list * rmvList( particle_list * list, particle_t * particle){
     return curr;
 }
 
-particle_list * addList( particle_list * list, particle_t * particle){
+particle_list * addList( particle_list * list, particle_t * particle, int procId){
     particle_list *newOne = (particle_list *)malloc(sizeof(particle_list));
     newOne->particle = particle;
 
@@ -113,13 +113,18 @@ void update_particle(particle_t *particle, cell * cells, long ncside, int proces
     double sizeCell = MAX_COORDINATES_VALUE/ncside;
     long newCellX = particle->x/sizeCell;
     long newCellY = particle->y/sizeCell;
-    long cellIndex = newCellX * ncside + newCellY;
+    long globalCellIndex = newCellX * ncside + newCellY;
 
-    if((cellIndex >= BLOCK_LOW(processId, NUMBER_OF_PROCESSES, ncside * ncside)) &&
-            (cellIndex <= BLOCK_HIGH(processId, NUMBER_OF_PROCESSES, ncside * ncside))){
-        particle->cellX = newCellX;
-        particle->cellY = newCellY;
-        addList( cells[cellIndex].particles, particle );
+    if((globalCellIndex >= BLOCK_LOW(processId, NUMBER_OF_PROCESSES, ncside * ncside)) &&
+            (globalCellIndex <= BLOCK_HIGH(processId, NUMBER_OF_PROCESSES, ncside * ncside))){
+        int localCellIndex = globalCellIndex - BLOCK_LOW(processId, NUMBER_OF_PROCESSES, ncside * ncside);
+        addList( cells[localCellIndex].particles, particle, processId );
+        particle_list * currentParticleList = cells[localCellIndex].particles->next;
+        while (currentParticleList != NULL) {
+            printf("PID %d  CI %d|  PX %0.2f  PY %0.2f\n", processId, localCellIndex,
+                    currentParticleList->particle->x, currentParticleList->particle->y);
+            currentParticleList = currentParticleList->next;
+        }
     }
 }
 
@@ -135,16 +140,15 @@ void move_particle(particle_t *particle, cell * cells, long ncside, int processI
     double sizeCell = MAX_COORDINATES_VALUE/NCSIDE;
     long newCellX = particle->x/sizeCell;
     long newCellY = particle->y/sizeCell;
-    long cellIndex = newCellX * ncside + newCellY;
+    long globalCellIndex = newCellX * ncside + newCellY;
 
-    if(!(cellIndex >= BLOCK_LOW(processId, NUMBER_OF_PROCESSES, ncside * ncside) &&
-         cellIndex <= BLOCK_HIGH(processId, NUMBER_OF_PROCESSES, ncside * ncside)) ||
-         cellIndex == oldCellIndex)return;
+    if(!(globalCellIndex >= BLOCK_LOW(processId, NUMBER_OF_PROCESSES, ncside * ncside) &&
+         globalCellIndex <= BLOCK_HIGH(processId, NUMBER_OF_PROCESSES, ncside * ncside)) ||
+         globalCellIndex == oldCellIndex)return;
+    int localCellIndex = globalCellIndex - BLOCK_LOW(processId, NUMBER_OF_PROCESSES, ncside * ncside);
+
     rmvList( cells[oldCellIndex].particles, particle );
-
-    particle->cellX = newCellX;
-    particle->cellY = newCellY;
-    addList( cells[cellIndex].particles, particle );
+    addList( cells[localCellIndex].particles, particle, processId);
 }
 
 /**
@@ -239,12 +243,12 @@ void exchangeGhostRows (cell * cells, long ncside, int senderProcessId, cell *  
     MPI_Waitall(2, requests, statuses);
 
     // Check the status for a possible error TODO use the count and cancelled to check errors
-    for (int statusesIndex = 0; statusesIndex < 2; statusesIndex++)
-        printf("Sender Id: %d | Status index: %d | Cancelled: %d | Count: %d\n",
-               senderProcessId, statusesIndex, statuses[statusesIndex]._cancelled, statuses[statusesIndex]._ucount);
+//    for (int statusesIndex = 0; statusesIndex < 2; statusesIndex++)
+//        printf("Sender Id: %d | Status index: %d | Cancelled: %d | Count: %d\n",
+//               senderProcessId, statusesIndex, statuses[statusesIndex]._cancelled, statuses[statusesIndex]._ucount);
 
-    printf("SID %d TOP||  X:%0.2f; Y:%0.2f; M:%0.2f\n", senderProcessId, topGhostRow[0].x,topGhostRow[0].y,topGhostRow[0].m);
-    printf("SID %d BOT||  X:%0.2f; Y:%0.2f; M:%0.2f\n", senderProcessId, bottomGhostRow[0].x,bottomGhostRow[0].y,bottomGhostRow[0].m);
+//    printf("SID %d TOP||  X:%0.2f; Y:%0.2f; M:%0.2f\n", senderProcessId, topGhostRow[0].x,topGhostRow[0].y,topGhostRow[0].m);
+//    printf("SID %d BOT||  X:%0.2f; Y:%0.2f; M:%0.2f\n", senderProcessId, bottomGhostRow[0].x,bottomGhostRow[0].y,bottomGhostRow[0].m);
 }
 
 /**
