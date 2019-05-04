@@ -492,7 +492,7 @@ cell * get_cell(long long unbounded_row, long long unbounded_column, cell *cells
  */
 void compute_force_and_update_particles(cell *cells, long ncside, int processId){
     for(long cellIndex = 0;
-            cellIndex < NUMBER_OF_ELEMENTS(processId, NUMBER_OF_PROCESSES, ncside * ncside, ncside); cellIndex++) {
+            cellIndex < NUMBER_OF_ELEMENTS(processId, NUMBER_OF_PROCESSES, ncside * ncside, ncside) + ncside; cellIndex++) {
         cell currCell = cells[cellIndex];
 
         long cellX = ceil(cellIndex / ncside);
@@ -691,7 +691,7 @@ int main(int args_length, char* args[]) {
     for(int i = 0; i < iterations; i++){
         //To simplify the index treatment (to start with 0) the cells matrix that goes through parameter omits the top ghost row
         compute_cell_center_mass(&cellMatrix[ncside * NUMBER_OF_GHOST_ROWS], ncside, rank);
-        //compute_force_and_update_particles(&cellMatrix[ncside * NUMBER_OF_GHOST_ROWS], ncside, rank);
+        //compute_force_and_update_particles(&cellMatrix[ncside * NUMBER_OF_GHOST_ROWS - ncside], ncside, rank);
     }
 
 
