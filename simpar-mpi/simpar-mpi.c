@@ -219,15 +219,15 @@ void exchangeGhostRows (cell * cells, long ncside, int senderProcessId) {
     if (NUMBER_OF_PROCESSES == 1) return; // If it is only one processor, there is no need for communication
 
 
-//    for(int i = 0 ; i < ncside * NUMBER_OF_GHOST_ROWS; i ++){
-//        printf("PID %d  | TOP GHOST SENT BY  |  CI %d  | NP: %d \n", senderProcessId, i, cells[i].nParticles);
-//    }
-//
-//    cell * pointer = &cells[NUMBER_OF_ELEMENTS(senderProcessId, NUMBER_OF_PROCESSES, ncside * ncside, ncside) -
-//                            (ncside * NUMBER_OF_GHOST_ROWS)];
-//    for(int i = 0 ; i < ncside * NUMBER_OF_GHOST_ROWS; i ++){
-//        printf("PID %d  | BOT GHOST SENT BY  |  CI %d  | NP: %d \n", senderProcessId, i, pointer[i].nParticles);
-//    }
+    for(int i = 0 ; i < ncside * NUMBER_OF_GHOST_ROWS; i ++){
+        printf("PID %d  | TOP GHOST SENT BY  |  CI %d  | NP: %d \n", senderProcessId, i, cells[i].nParticles);
+    }
+
+    cell * pointer = &cells[NUMBER_OF_ELEMENTS(senderProcessId, NUMBER_OF_PROCESSES, ncside * ncside, ncside) -
+                            (ncside * NUMBER_OF_GHOST_ROWS)];
+    for(int i = 0 ; i < ncside * NUMBER_OF_GHOST_ROWS; i ++){
+        printf("PID %d  | BOT GHOST SENT BY  |  CI %d  | NP: %d \n", senderProcessId, i, pointer[i].nParticles);
+    }
 
     int topProcessId = (senderProcessId - 1 + NUMBER_OF_PROCESSES) % NUMBER_OF_PROCESSES;
     int bottomProcessId = (senderProcessId + 1 + NUMBER_OF_PROCESSES) % NUMBER_OF_PROCESSES;
@@ -236,7 +236,9 @@ void exchangeGhostRows (cell * cells, long ncside, int senderProcessId) {
     MPI_Request requests[2];
 
     cell * topGhostRow = (cells - (ncside * NUMBER_OF_GHOST_ROWS));
-    cell * bottomGhostRow = &cells[NUMBER_OF_ELEMENTS(bottomProcessId, NUMBER_OF_PROCESSES, ncside * ncside, ncside)];
+    cell * bottomGhostRow = (cells +  NUMBER_OF_ELEMENTS(bottomProcessId, NUMBER_OF_PROCESSES, ncside * ncside, ncside)); //&cells[NUMBER_OF_ELEMENTS(bottomProcessId, NUMBER_OF_PROCESSES, ncside * ncside, ncside) + 1];
+
+    printf("PID %d  | BOT | NP: %d NOF %d\n", senderProcessId, bottomGhostRow->nParticles, NUMBER_OF_ELEMENTS(bottomProcessId, NUMBER_OF_PROCESSES, ncside * ncside, ncside));
 
     MPI_Irecv(topGhostRow, ncside * NUMBER_OF_GHOST_ROWS, cellMPIType, topProcessId,
               SEND_GHOST_ROW_TAG, MPI_COMM_WORLD, &requests[0]);
@@ -245,27 +247,26 @@ void exchangeGhostRows (cell * cells, long ncside, int senderProcessId) {
 
     MPI_Send(cells, ncside * NUMBER_OF_GHOST_ROWS, cellMPIType, topProcessId, SEND_GHOST_ROW_TAG, MPI_COMM_WORLD);
 
-    MPI_Send(&cells[NUMBER_OF_ELEMENTS(senderProcessId, NUMBER_OF_PROCESSES, ncside * ncside, ncside) -
-    (ncside * NUMBER_OF_GHOST_ROWS)],ncside * NUMBER_OF_GHOST_ROWS, cellMPIType, bottomProcessId,
+    MPI_Send(bottomGhostRow - (ncside * NUMBER_OF_GHOST_ROWS),ncside * NUMBER_OF_GHOST_ROWS, cellMPIType, bottomProcessId,
             SEND_GHOST_ROW_TAG, MPI_COMM_WORLD);
 
     // Ideally, use the fact that a row is received to compute the movements on the received side (more parallelism = less time)
     MPI_Waitall(2, requests, statuses);
-//    printf("---------------- after wait all--------\n");
-//    for(int i = 0 ; i < ncside * NUMBER_OF_GHOST_ROWS; i ++){
-//        printf("PID %d  | TOP GHOST RECV BY %d |  CI %d  | NP: %d \n", senderProcessId, topProcessId, i, topGhostRow[i].nParticles);
-//    }
-//
-//    for(int i = 0 ; i < ncside * NUMBER_OF_GHOST_ROWS; i ++){
-//        printf("PID %d  | BOT GHOST RECV BY %d |  CI %d  | NP: %d \n", senderProcessId, bottomProcessId, i, bottomGhostRow[i].nParticles);
-//    }
+    printf("---------------- after wait all--------\n");
+    for(int i = 0 ; i < ncside * NUMBER_OF_GHOST_ROWS; i ++){
+        printf("PID %d  | TOP GHOST RECV BY %d |  CI %d  | NP: %d \n", senderProcessId, topProcessId, i, topGhostRow[i].nParticles);
+    }
+
+    for(int i = 0 ; i < ncside * NUMBER_OF_GHOST_ROWS; i ++){
+        printf("PID %d  | BOT GHOST RECV BY %d |  CI %d  | NP: %d \n", senderProcessId, bottomProcessId, i, bottomGhostRow[i].nParticles);
+    }
 
     //count all particles that exists in frontier rows
     long long countTopParticlesToSend, countDownParticlesToSend, countTopParticlesToReceive, countDownParticlesToReceive;
     countTopParticlesToSend = countDownParticlesToSend = countTopParticlesToReceive = countDownParticlesToReceive = 0;
     cell * topParticlesToSend = cells;
     cell * downParticlesToSend = bottomGhostRow - ncside;
-    cell * topParticlesToReceive = cells;
+    cell * topParticlesToReceive = topGhostRow;
     cell * downParticlesToReceive = bottomGhostRow;
     for(int cellIndex = 0; cellIndex < ncside; cellIndex++){
         countTopParticlesToSend += topParticlesToSend[cellIndex].nParticles;
@@ -292,9 +293,9 @@ void exchangeGhostRows (cell * cells, long ncside, int senderProcessId) {
     particle_t downParticlesToReceiveBuffer [countDownParticlesToReceive];
 
     MPI_Irecv(topParticlesToReceiveBuffer, countTopParticlesToReceive, particleMPIType, topProcessId,
-              SEND_GHOST_PARTICLES_TAG, MPI_COMM_WORLD, &requests[0]);
+             SEND_GHOST_PARTICLES_TAG, MPI_COMM_WORLD, &requests[0]);
     MPI_Irecv(downParticlesToReceiveBuffer, countDownParticlesToReceive, particleMPIType, bottomProcessId,
-              SEND_GHOST_PARTICLES_TAG, MPI_COMM_WORLD, &requests[1]);
+             SEND_GHOST_PARTICLES_TAG, MPI_COMM_WORLD, &requests[1]);
 
     MPI_Send(topParticlesToSendBuffer, countTopParticlesToSend, particleMPIType, topProcessId,
             SEND_GHOST_PARTICLES_TAG, MPI_COMM_WORLD);
@@ -304,8 +305,7 @@ void exchangeGhostRows (cell * cells, long ncside, int senderProcessId) {
 
     printf("Chegou aqui 5\n");
 
-
-    printf("CTPR %d, CTPS %d || CDPR %d CDPS %d\n", countTopParticlesToReceive, countTopParticlesToSend, countDownParticlesToReceive, countDownParticlesToSend);
+    printf("PID %d || CTPR %d, CTPS %d || CDPR %d CDPS %d\n", senderProcessId, countTopParticlesToReceive, countTopParticlesToSend, countDownParticlesToReceive, countDownParticlesToSend);
     MPI_Waitall(2, requests, statuses);
 
 /*
@@ -624,7 +624,7 @@ void mapCellToMPI(MPI_Datatype * newType){
     int blocklens[] = {3 /*doubles*/,2 /*long long*/};
     MPI_Aint extent;
     MPI_Type_extent(MPI_DOUBLE, &extent);
-    MPI_Aint indices[] = {0, 3 * extent /* we have 5 doubles */};
+    MPI_Aint indices[] = {0, 3 * extent /* we have 3 doubles */};
     MPI_Datatype oldTypes[] = {MPI_DOUBLE, MPI_LONG_LONG};
     MPI_Type_struct(2, blocklens, indices, oldTypes, newType);
     MPI_Type_commit(newType);
