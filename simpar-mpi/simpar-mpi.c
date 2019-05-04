@@ -267,7 +267,7 @@ void exchangeGhostRows (cell * cells, long ncside, int senderProcessId) {
     cell * topParticlesToSend = cells;
     cell * downParticlesToSend = bottomGhostRow - ncside;
     cell * topParticlesToReceive = topGhostRow;
-    cell * downParticlesToReceive = bottomGhostRow;
+    cell * downParticlesToReceive = bottomGhostRow + ncside;
     for(int cellIndex = 0; cellIndex < ncside; cellIndex++){
         countTopParticlesToSend += topParticlesToSend[cellIndex].nParticles;
         countDownParticlesToSend += downParticlesToSend[cellIndex].nParticles;
@@ -621,7 +621,7 @@ void compute_overall_center_mass(cell * cells, long ncside, int processId){
 }
 
 void mapCellToMPI(MPI_Datatype * newType){
-    int blocklens[] = {3 /*doubles*/,2 /*long long*/};
+    int blocklens[] = {3 /*doubles*/,3 /*long long*/};
     MPI_Aint extent;
     MPI_Type_extent(MPI_DOUBLE, &extent);
     MPI_Aint indices[] = {0, 3 * extent /* we have 3 doubles */};
