@@ -380,6 +380,7 @@ void compute_cell_center_mass(cell * cells, long ncside, int processId) {
         if(currCell.nParticles > 0){ //avoid div by 0
             for(long long particleIndex = 0; particleIndex < currCell.nParticles; particleIndex++) {
                 particle_t * currentParticle = &currCell.particles[particleIndex];
+                printf("PID %d CI %d PI %d X %0.2f\n", processId, cellIndex, particleIndex, currentParticle->x);
                 cells[cellIndex].x += currentParticle->x * currentParticle->m;
                 cells[cellIndex].y += currentParticle->y * currentParticle->m;
                 cells[cellIndex].m += currentParticle->m;
@@ -387,6 +388,7 @@ void compute_cell_center_mass(cell * cells, long ncside, int processId) {
             cells[cellIndex].x /= cells[cellIndex].m;
             cells[cellIndex].y /= cells[cellIndex].m;
         }
+        printf("PID %d CI %d X %0.2f\n", processId, cellIndex, cells[cellIndex].x);
     }
 
 //    printf("PID %d TOP|| X:%0.2f; Y:%0.2f; M:%0.2f\n", processId, cells[1].x,cells[1].y,cells[1].m);
@@ -451,28 +453,28 @@ void update_particle_position(particle_t * particle, double Fx, double Fy, cell 
  * @param cell_dimension    dimension of each cell
  * @return                  the neighbor cell
  */
-cell * get_cell(int pid, long long unbounded_row, long long unbounded_column, cell *cells, cell * return_cell, long ncside){
+void get_cell(long long unbounded_row, long long unbounded_column, cell *cells, cell * return_cell, long ncside){
+    long cellIndex;
     if (unbounded_column >= 0 && unbounded_column < ncside){
-        return &cells[unbounded_row * ncside + unbounded_column];
+        cellIndex = unbounded_row * ncside + unbounded_column;
     } else {
         long bounded_column = (unbounded_column + ncside) % ncside;
-        long cellIndex = unbounded_row * ncside + bounded_column;
-        printf("PID %d | CIG %d\n", pid, cellIndex);
-
-        return_cell->x = cells[cellIndex].x;
-        return_cell->y = cells[cellIndex].y;
-        return_cell->m = cells[cellIndex].m;
-
-        if (unbounded_column < 0)
-            return_cell->x -= MAX_COORDINATES_VALUE;
-        else if (unbounded_column >= ncside)
-            return_cell->x += MAX_COORDINATES_VALUE;
+        cellIndex = unbounded_row * ncside + bounded_column;
     }
 
-    return return_cell;
+    return_cell->x = cells[cellIndex].x;
+    return_cell->y = cells[cellIndex].y;
+    return_cell->m = cells[cellIndex].m;
+    return_cell->nParticles = cells[cellIndex].nParticles;
+    return_cell->allocatedSpace = cells[cellIndex].allocatedSpace;
+
+    if (unbounded_column < 0)
+        return_cell->x -= MAX_COORDINATES_VALUE;
+    else if (unbounded_column >= ncside)
+        return_cell->x += MAX_COORDINATES_VALUE;
 }
 
-/**
+/**§
  * Function that computes the force being applied to all particles and updates their cell after being moved
  *
  * @param particles         list with the particles
@@ -483,7 +485,7 @@ cell * get_cell(int pid, long long unbounded_row, long long unbounded_column, ce
  */
 void compute_force_and_update_particles(cell *cells, long ncside, int processId){
     for(long cellIndex = ncside;
-            cellIndex < NUMBER_OF_ELEMENTS(processId, NUMBER_OF_PROCESSES, ncside * ncside, ncside) + (ncside * NUMBER_OF_GHOST_ROWS * 2);
+            cellIndex < NUMBER_OF_ELEMENTS(processId, NUMBER_OF_PROCESSES, ncside * ncside, ncside) + (ncside * NUMBER_OF_GHOST_ROWS * 2) - ncside;
             cellIndex++) {
         cell currCell = cells[cellIndex];
 
@@ -495,10 +497,14 @@ void compute_force_and_update_particles(cell *cells, long ncside, int processId)
         int neighboursListIndex = 0;
         for (int row = -1; row < 2; row++) {
             for (int column = -1; column < 2; column++) {
-                get_cell(processId, column + cellX, row + cellY, cells,
-                        &neighboursList[neighboursListIndex++], ncside);
+                get_cell(column + cellX, row + cellY, cells,
+                       &neighboursList[neighboursListIndex++], ncside);
             }
         }
+
+//        for (neighboursListIndex = 0; neighboursListIndex < 9; neighboursListIndex++) {
+//            printf("PID %d | NI %d NP %d\n", processId, neighboursListIndex, neighboursList[neighboursListIndex].nParticles);
+//        }
 
         for(long long particleIndex = 0; particleIndex < currCell.nParticles; particleIndex++) {
             particle_t *currentParticle = &(currCell.particles[particleIndex]);
@@ -507,10 +513,12 @@ void compute_force_and_update_particles(cell *cells, long ncside, int processId)
             double Fy = 0;
             for (neighboursListIndex = 0; neighboursListIndex < 9; neighboursListIndex++) {
                 //if that cell doesn't have any particle, no central mass will exist, so we ignore
-                printf("PID %d  ||  NI %d  ||  NP %d\n", processId, neighboursListIndex,
-                        neighboursList[neighboursListIndex].nParticles);
+//                printf("PID %d  ||  NI %d  ||  NP %d\n", processId, neighboursListIndex,
+//                        neighboursList[neighboursListIndex].nParticles);
                 if (neighboursList[neighboursListIndex].m == 0)
                     continue;
+                printf("PID %d CI %d NI%d || NCX %0.2f NCY %0.2f\n",processId, cellIndex, neighboursListIndex,
+                       neighboursList[neighboursListIndex].x, neighboursList[neighboursListIndex].y);
 
                 //compute angle
                 double delta_x = neighboursList[neighboursListIndex].x - currentParticle->x;
