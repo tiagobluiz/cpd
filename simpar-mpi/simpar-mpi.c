@@ -41,7 +41,7 @@ typedef struct {
     double m;
     long cellX;
     long cellY;
-    int alreadyMoved; //Flag to check if a particle was already verified
+    long alreadyMoved; //Flag to check if a particle was already verified
 }particle_t;
 
 typedef struct {
@@ -98,7 +98,7 @@ void rmvList( cell * cell, particle_t * particle){
             return;
         }
     }
-    perror("A particle was not removed as it should be");
+    printf("\t\t/!\\ A particle was not removed as it should be\n");
 }
 
 void addList(cell * cell, particle_t * particle){
@@ -279,11 +279,16 @@ void exchangeGhostRows (cell * cells, long ncside, int senderProcessId) {
     cell * downParticlesToSend = bottomGhostRow - ncside;
     cell * topParticlesToReceive = topGhostRow + ncside;
     cell * downParticlesToReceive = bottomGhostRow;
-    for(int cellIndex = 0; cellIndex < ncside; cellIndex++){
+    for(long cellIndex = 0; cellIndex < ncside; cellIndex++){
         countTopParticlesToSend += topParticlesToSend[cellIndex].nParticles;
         countDownParticlesToSend += downParticlesToSend[cellIndex].nParticles;
         countTopParticlesToReceive += topParticlesToReceive[cellIndex].nParticles;
         countDownParticlesToReceive += downParticlesToReceive[cellIndex].nParticles;
+    }
+
+    for (long cellIndex = 0; cellIndex < ncside * NUMBER_OF_GHOST_ROWS; cellIndex++){
+        if (senderProcessId == 0) topGhostRow[cellIndex].y -= MAX_COORDINATES_VALUE;
+        else if (senderProcessId == NUMBER_OF_PROCESSES - 1) bottomGhostRow[cellIndex].y += MAX_COORDINATES_VALUE;
     }
 
     particle_t topParticlesToSendBuffer [countTopParticlesToSend];
@@ -344,15 +349,25 @@ void exchangeGhostRows (cell * cells, long ncside, int senderProcessId) {
     particle_t * pParticlesTopParticlesToReceive = topParticlesToReceiveBuffer;
     particle_t * pParticlesDownParticlesToReceive = downParticlesToReceiveBuffer;
     
-    for(int cellIndex = 0; cellIndex < ncside; cellIndex++){
+    for(long cellIndex = 0; cellIndex < ncside; cellIndex++){
         topParticlesToReceive[cellIndex].particles = (particle_t *)malloc(topParticlesToReceive[cellIndex].allocatedSpace * sizeof(particle_t));
         memcpy(topParticlesToReceive[cellIndex].particles, pParticlesTopParticlesToReceive, topParticlesToReceive[cellIndex].nParticles * sizeof(particle_t));
-        pParticlesTopParticlesToReceive += topGhostRow[cellIndex].nParticles;
+        pParticlesTopParticlesToReceive += topParticlesToReceive[cellIndex].nParticles;
+
+        for(long long particleIndex = 0;
+            senderProcessId == 0 && particleIndex < topParticlesToReceive[cellIndex].nParticles; particleIndex++){
+            topParticlesToReceive[cellIndex].particles[particleIndex].y -= MAX_COORDINATES_VALUE;
+        }
 
         downParticlesToReceive[cellIndex].particles = (particle_t *)malloc(downParticlesToReceive[cellIndex].allocatedSpace * sizeof(particle_t));
         memcpy(downParticlesToReceive[cellIndex].particles, pParticlesDownParticlesToReceive, downParticlesToReceive[cellIndex].nParticles * sizeof(particle_t));
         pParticlesDownParticlesToReceive += downParticlesToReceive[cellIndex].nParticles;
+        for(long long particleIndex = 0;
+        (senderProcessId == NUMBER_OF_PROCESSES - 1) && particleIndex < downParticlesToReceive[cellIndex].nParticles; particleIndex++){
+            downParticlesToReceive[cellIndex].particles[particleIndex].y += MAX_COORDINATES_VALUE;
+        }
     }
+
 
     // Check the status for a possible error TODO use the count and cancelled to check errors
 //    for (int statusesIndex = 0; statusesIndex < 2; statusesIndex++)
@@ -432,7 +447,7 @@ double compute_magnitude_force(particle_t * a, cell * b) {
  */
 void update_particle_position(particle_t * particle, double Fx, double Fy, cell * cells, long ncside, int processId, long cellIndex){
 
-    printf("%d B|| px %0.2f py %0.2f ci %d\n", processId, particle->x, particle->y, cellIndex);
+    printf("%d B|| px %0.2f py %0.2f m %0.2f ci %d\n", processId, particle->x, particle->y, particle->m, cellIndex);
     particle->alreadyMoved = 1;
     double acceleration_x = Fx/particle->m;
     double acceleration_y = Fy/particle->m;
@@ -447,7 +462,7 @@ void update_particle_position(particle_t * particle, double Fx, double Fy, cell 
     printf("%d A|| px %0.2f py %0.2f ci %d\n", processId, particle->x, particle->y, cellIndex);
     //Since the particles may come from another process
 
-    move_particle(particle, cells, ncside, cellIndex, processId, cellIndex);
+     move_particle(particle, cells, ncside, cellIndex, processId, cellIndex);
 }
 
 /**
@@ -484,8 +499,6 @@ void get_cell(int pid, long long unbounded_row, long long unbounded_column, cell
         return_cell->x -= MAX_COORDINATES_VALUE;
     else if (unbounded_column >= ncside)
         return_cell->x += MAX_COORDINATES_VALUE;
-
-    //todo does really the  need  to change de y disappeared???
 }
 
 /**§
@@ -646,10 +659,11 @@ void mapCellToMPI(MPI_Datatype * newType){
 }
 
 void mapParticleToMPI(MPI_Datatype * newType){
-    int blocklens[] = {5 /*doubles*/,2 /*long*/};
-    MPI_Aint extent;
-    MPI_Type_extent(MPI_DOUBLE, &extent);
-    MPI_Aint indices[] = {0, 5 * extent /* we have 5 doubles */};
+    int blocklens[] = {5 /*doubles*/,3 /*long*/};
+    MPI_Aint extentDouble, extentLong;
+    MPI_Type_extent(MPI_DOUBLE, &extentDouble);
+//    MPI_Type_extent(MPI_LONG, &extentLong);
+    MPI_Aint indices[] = {0, 5 * extentDouble /* we have 5 doubles */};
     MPI_Datatype oldTypes[] = {MPI_DOUBLE, MPI_LONG};
     MPI_Type_struct(2, blocklens, indices, oldTypes, newType);
     MPI_Type_commit(newType);
@@ -706,12 +720,12 @@ int main(int args_length, char* args[]) {
 
     create_grid(particles, n_part, cellMatrix, ncside, rank);
 
-    for (long cellIndex = ncside; cellIndex < TOTAL_ELEMENTS - ncside; cellIndex++){
-        for(long long particleIndex = 0; particleIndex < cellMatrix[cellIndex].nParticles; particleIndex++){
-            printf("PID %d CI %d PI %d||| px %0.2f  py %0.2f\n", rank, cellIndex, particleIndex, cellMatrix[cellIndex].particles[particleIndex].x, cellMatrix[cellIndex].particles[particleIndex].y);
-        }
-    }
-    printf("-------------\n");
+//    for (long cellIndex = ncside; cellIndex < TOTAL_ELEMENTS - ncside; cellIndex++){
+//        for(long long particleIndex = 0; particleIndex < cellMatrix[cellIndex].nParticles; particleIndex++){
+//            printf("PID %d CI %d PI %d||| px %0.2f  py %0.2f m %0.2f\n", rank, cellIndex, particleIndex, cellMatrix[cellIndex].particles[particleIndex].x, cellMatrix[cellIndex].particles[particleIndex].y, cellMatrix[cellIndex].particles[particleIndex].m);
+//        }
+//    }
+//    printf("-------------\n");
 //    for(int i = 0; i < n_part; i++)
 //        printf("Process id: %d | Particula %d | %0.2f %0.2f %0.2f \n", rank, i, particles[i].x, particles[i].y, particles[i].m);
     /*
@@ -726,11 +740,11 @@ int main(int args_length, char* args[]) {
         //To simplify the index treatment (to start with 0) the cells matrix that goes through parameter omits the top ghost row
         compute_cell_center_mass(&cellMatrix[ncside * NUMBER_OF_GHOST_ROWS], ncside, rank);
 
-        for (long cellIndex = ncside; cellIndex < TOTAL_ELEMENTS - ncside; cellIndex++){
-            for(long long particleIndex = 0; particleIndex < cellMatrix[cellIndex].nParticles; particleIndex++){
-                printf("PID %d CI %d PI %d||| px %0.2f  py %0.2f\n", rank, cellIndex, particleIndex, cellMatrix[cellIndex].particles[particleIndex].x, cellMatrix[cellIndex].particles[particleIndex].y);
-            }
-        }
+//        for (long cellIndex = ncside; cellIndex < TOTAL_ELEMENTS - ncside; cellIndex++){
+//            for(long long particleIndex = 0; particleIndex < cellMatrix[cellIndex].nParticles; particleIndex++){
+//                printf("PID %d CI %d PI %d||| px %0.2f  py %0.2f\n", rank, cellIndex, particleIndex, cellMatrix[cellIndex].particles[particleIndex].x, cellMatrix[cellIndex].particles[particleIndex].y);
+//            }
+//        }
 
 
         compute_force_and_update_particles(cellMatrix, ncside, rank);
