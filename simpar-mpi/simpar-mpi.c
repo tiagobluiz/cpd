@@ -187,9 +187,7 @@ void clean_cells(cell * cells, long ncside, int processId){
  * @return Matrix of cells and update the matrix coordenates of each particle
  */
 cell * create_grid(particle_t * particles, long long numberOfParticles, cell * cells, long ncside, int processId){
-    for (long cellIndex = 0;
-            cellIndex < NUMBER_OF_ELEMENTS(processId, NUMBER_OF_PROCESSES, ncside * ncside, ncside)
-            + ncside * NUMBER_OF_GHOST_ROWS * 2; cellIndex++){
+    for (long cellIndex = 0; cellIndex < TOTAL_ELEMENTS; cellIndex++){
         cells[cellIndex].particles = (particle_t *)calloc(1, sizeof(particle_t));
         cells[cellIndex].allocatedSpace = 1;
     }
@@ -708,7 +706,12 @@ int main(int args_length, char* args[]) {
 
     create_grid(particles, n_part, cellMatrix, ncside, rank);
 
-
+    for (long cellIndex = ncside; cellIndex < TOTAL_ELEMENTS - ncside; cellIndex++){
+        for(long long particleIndex = 0; particleIndex < cellMatrix[cellIndex].nParticles; particleIndex++){
+            printf("PID %d CI %d PI %d||| px %0.2f  py %0.2f\n", rank, cellIndex, particleIndex, cellMatrix[cellIndex].particles[particleIndex].x, cellMatrix[cellIndex].particles[particleIndex].y);
+        }
+    }
+    printf("-------------\n");
 //    for(int i = 0; i < n_part; i++)
 //        printf("Process id: %d | Particula %d | %0.2f %0.2f %0.2f \n", rank, i, particles[i].x, particles[i].y, particles[i].m);
     /*
@@ -722,9 +725,13 @@ int main(int args_length, char* args[]) {
 
         //To simplify the index treatment (to start with 0) the cells matrix that goes through parameter omits the top ghost row
         compute_cell_center_mass(&cellMatrix[ncside * NUMBER_OF_GHOST_ROWS], ncside, rank);
-        for(int cellIndex = ncside ; cellIndex < NUMBER_OF_ELEMENTS(rank, NUMBER_OF_PROCESSES, ncside * ncside, ncside) + (ncside * NUMBER_OF_GHOST_ROWS); cellIndex++){
-            printf("PID %d CI %d | NP %d \n", rank, cellIndex,cellMatrix[cellIndex].nParticles);
+
+        for (long cellIndex = ncside; cellIndex < TOTAL_ELEMENTS - ncside; cellIndex++){
+            for(long long particleIndex = 0; particleIndex < cellMatrix[cellIndex].nParticles; particleIndex++){
+                printf("PID %d CI %d PI %d||| px %0.2f  py %0.2f\n", rank, cellIndex, particleIndex, cellMatrix[cellIndex].particles[particleIndex].x, cellMatrix[cellIndex].particles[particleIndex].y);
+            }
         }
+
 
         compute_force_and_update_particles(cellMatrix, ncside, rank);
     }
