@@ -14,8 +14,8 @@
 #define BLOCK_HIGH(id,p,n) (BLOCK_LOW((id)+1,p,n)-1)
 #define BLOCK_SIZE(id,p,n) (BLOCK_HIGH(id,p,n)-BLOCK_LOW(id,p,n)+1)
 
-#define LOW_COORDINATES(p,myp) (MAX_COORDINATES_VALUE/p)*myp
-#define HIGH_COORDINATES(p,myp) (p-1 == myp)? MAX_COORDINATES_VALUE : LOW_COORDINATES(p,myp+1)
+#define LOW_Y_COORDINATES(p,myp) (MAX_COORDINATES_VALUE/p)*myp
+#define HIGH_Y_COORDINATES(p,myp) LOW_Y_COORDINATES(p,myp+1)
 
 // s = ncside
 #define STARTING_ROW(id,p,n,s) BLOCK_LOW(id,p,n)/s
@@ -82,19 +82,11 @@ void init_particles(long seed, long ncside, long long n_part, particle_t *par)
 }
 
 void rmvList( cell * cell, particle_t * particle, int pid){
-
     for(long long particleIndex = 0; particleIndex < cell->nParticles; particleIndex++) {
-     //   printf("----------PID %d cellNP %d PAR %x PARCELL %x px %0.2f cx %0.2f py %0.2f cy %0.2f pm %0.2f cm %0.2f\n",pid, cell->nParticles, particle, &(cell->particles[particleIndex]), particle->x, cell->particles[particleIndex].x , particle->y , cell->particles[particleIndex].y, particle->m , cell->particles[particleIndex].m);
+//        printf("----------PID %d cellNP %d PAR %x PARCELL %x px %0.2f cpx %0.2f py %0.2f cpy %0.2f pm %0.2f cpm %0.2f\n",pid, cell->nParticles, particle, &(cell->particles[particleIndex]), particle->x, cell->particles[particleIndex].x , particle->y , cell->particles[particleIndex].y, particle->m , cell->particles[particleIndex].m);
 
         if(&(cell->particles[particleIndex]) != particle) continue;//if same pointer do below
-//        if(particle->x == cell->particles[particleIndex].x && particle->y == cell->particles[particleIndex].y &&
-//        particle->m == cell->particles[particleIndex].m){
-            cell->particles[0].x;
-     //       printf("passou \n");
-            memmove(cell->particles, (cell + 1)->particles, (cell->nParticles - particleIndex) * sizeof(particle_t));
-     //       printf("removed\n");
-            cell->particles[0].x;
-     //       printf("no error \n");
+            memcpy(&cell->particles[particleIndex], &cell->particles[particleIndex +1], (cell->nParticles - particleIndex) * sizeof(particle_t));
             cell->nParticles--;
             cell->allocatedSpace--;
 
@@ -103,7 +95,6 @@ void rmvList( cell * cell, particle_t * particle, int pid){
                 cell->allocatedSpace /= 2;
                 cell->particles = (particle_t * )realloc(cell->particles, (cell->allocatedSpace) * sizeof(particle_t));
             }
-         printf("\t\t/!!!!!!!!!!!\\ A particle WAS removed as it should be\n");
             return;
     }
     printf("\t\t/!\\ A particle was not removed as it should be\n");
@@ -121,16 +112,12 @@ void addList(cell * cell, particle_t * particle){
             cell->particles = buffer;
         }
     }
-    printf("Particle m: %0.2f | x: %0.2f | %0.2f\n", particle->m, particle->x, particle->y);
-    //double m = cell->particles[cell->nParticles].m;
-    printf("Fora do if - Allocated space %d | Number of particles %d\n",cell->allocatedSpace, cell->nParticles );
+//    printf("Particle m: %0.2f | x: %0.2f | %0.2f\n", particle->m, particle->x, particle->y);
     //for(int i = 0; i < cell->nParticles; i++)
      //   printf("")
 
     cell->particles[cell->nParticles] = *particle;
-    //printf("END OF METHOD Fora do if - Allocated space %d | Number of particles %d\n",cell->allocatedSpace, cell->nParticles );
     cell->nParticles++;
-    printf("END OF ADDLIST - Allocated space %d | Number of particles %d\n",cell->allocatedSpace, cell->nParticles );
 }
 
 /**
@@ -151,7 +138,7 @@ void update_particle(particle_t *particle, cell * cells, long ncside, int proces
 
 
     int localCellIndex = globalCellIndex - BLOCK_LOW(processId, NUMBER_OF_PROCESSES, ncside * ncside);
-    printf("Update Particle on Start | PID %d | GI %d | LI %d | X: %0.2f | Y: %0.2f\n", processId, globalCellIndex, localCellIndex, particle->x, particle->y);
+//    printf("Update Particle on Start | PID %d | GI %d | LI %d | X: %0.2f | Y: %0.2f\n", processId, globalCellIndex, localCellIndex, particle->x, particle->y);
     addList( &cells[localCellIndex], particle );
 }
 
@@ -168,18 +155,15 @@ void move_particle(particle_t *particle, cell * cells, long ncside, long oldCell
     int x = particle->x/sizeCell;
     long globalCellIndex =  y*ncside + x;
 
-
-
     long localCellIndex = globalCellIndex - BLOCK_LOW(processId, NUMBER_OF_PROCESSES, ncside * ncside) + ncside * NUMBER_OF_GHOST_ROWS;
     if(localCellIndex == oldCellIndex) return;
 
-//    printf("CHECK GLOBAL INDEX | PID: %d | Global Index: %d | Local Index: %d | Old Index: %d\n", processId, globalCellIndex, localCellIndex, oldCellIndex);
-
-    if((particle->y >= LOW_COORDINATES(NUMBER_OF_PROCESSES, processId)) && (particle->y <= HIGH_COORDINATES(NUMBER_OF_PROCESSES, processId))) {
-        printf("ENTROU NO ADD | PID %d || lets add/remove x %0.2f y %0.2f on ci%d (%0.2f , %0.2f) gi %d li %d \n",processId, particle->x, particle->y, oldCellIndex, LOW_COORDINATES(NUMBER_OF_PROCESSES, processId), HIGH_COORDINATES(NUMBER_OF_PROCESSES, processId), globalCellIndex, localCellIndex);
+    if((globalCellIndex >= BLOCK_LOW(processId,NUMBER_OF_PROCESSES, ncside * ncside)) &&
+    (globalCellIndex <= BLOCK_HIGH( processId, NUMBER_OF_PROCESSES, ncside * ncside))) {
+//        printf("ENTROU NO ADD | PID %d || lets add/remove x %0.2f y %0.2f on ci%d (%0.2f , %0.2f) gi %d li %d \n",processId, particle->x, particle->y, oldCellIndex, lc, hc, globalCellIndex, localCellIndex);
         addList(&cells[localCellIndex], particle);
     }
-    printf("%d || lets remove x %0.2f y %0.2f on ci%d (rci %d) gi %d li %d \n",processId, particle->x, particle->y, oldCellIndex, ci, globalCellIndex, localCellIndex);
+//    printf("%d || lets remove x %0.2f y %0.2f on ci%d (rci %d) gi %d li %d \n",processId, particle->x, particle->y, oldCellIndex, ci, globalCellIndex, localCellIndex);
     rmvList( &cells[oldCellIndex], particle, processId );
 }
 
@@ -192,6 +176,8 @@ void clean_cells(cell * cells, long ncside, int processId){
     for (long cellIndex = 0; cellIndex < NUMBER_OF_ELEMENTS(processId, NUMBER_OF_PROCESSES, ncside * ncside, ncside); cellIndex++){
         cells[cellIndex].x = cells[cellIndex].y =
         cells[cellIndex].m = 0;
+        for (long particleIndex = 0; particleIndex < cells[cellIndex].nParticles; particleIndex++)
+            cells[cellIndex].particles[particleIndex].alreadyMoved = 0;
     }
 }
 
@@ -374,6 +360,11 @@ void exchangeGhostRows (cell * cells, long ncside, int senderProcessId) {
     particle_t * pParticlesDownParticlesToReceive = downParticlesToReceiveBuffer;
     
     for(long cellIndex = 0; cellIndex < ncside; cellIndex++){
+//        topGhostRow[cellIndex].allocatedSpace = 1;
+//        topGhostRow[cellIndex].nParticles = 0;
+//        topGhostRow[cellIndex].particles = (particle_t *)calloc(topGhostRow[cellIndex].allocatedSpace * sizeof(particle_t));
+
+
         topParticlesToReceive[cellIndex].particles = (particle_t *)malloc(topParticlesToReceive[cellIndex].allocatedSpace * sizeof(particle_t));
         memcpy(topParticlesToReceive[cellIndex].particles, pParticlesTopParticlesToReceive, topParticlesToReceive[cellIndex].nParticles * sizeof(particle_t));
         pParticlesTopParticlesToReceive += topParticlesToReceive[cellIndex].nParticles;
@@ -382,6 +373,10 @@ void exchangeGhostRows (cell * cells, long ncside, int senderProcessId) {
             senderProcessId == 0 && particleIndex < topParticlesToReceive[cellIndex].nParticles; particleIndex++){
             topParticlesToReceive[cellIndex].particles[particleIndex].y -= MAX_COORDINATES_VALUE;
         }
+
+//        bottomGhostRow[cellIndex+ncside].allocatedSpace = 1;
+//        bottomGhostRow[cellIndex+ncside].nParticles = 0;
+//        bottomGhostRow[cellIndex+ncside].particles = (particle_t *)calloc(bottomGhostRow[cellIndex+ncside].allocatedSpace * sizeof(particle_t));;
 
         downParticlesToReceive[cellIndex].particles = (particle_t *)malloc(downParticlesToReceive[cellIndex].allocatedSpace * sizeof(particle_t));
         memcpy(downParticlesToReceive[cellIndex].particles, pParticlesDownParticlesToReceive, downParticlesToReceive[cellIndex].nParticles * sizeof(particle_t));
@@ -435,12 +430,6 @@ void compute_cell_center_mass(cell * cells, long ncside, int processId) {
 //        printf("PID %d CI %d X %0.2f\n", processId, cellIndex, cells[cellIndex].x);
     }
 
-//    printf("PID %d TOP|| X:%0.2f; Y:%0.2f; M:%0.2f\n", processId, cells[1].x,cells[1].y,cells[1].m);
-//    printf("PID %d BOT|| X:%0.2f; Y:%0.2f; M:%0.2f\n", processId,
-//            cells[NUMBER_OF_ELEMENTS(processId, NUMBER_OF_PROCESSES, ncside * ncside, ncside)-2].x,
-//            cells[NUMBER_OF_ELEMENTS(processId, NUMBER_OF_PROCESSES, ncside * ncside, ncside)-2].y,
-//            cells[NUMBER_OF_ELEMENTS(processId, NUMBER_OF_PROCESSES, ncside * ncside, ncside)-2].m);
-
     exchangeGhostRows(cells, ncside, processId);
 }
 
@@ -471,7 +460,7 @@ double compute_magnitude_force(particle_t * a, cell * b) {
  */
 void update_particle_position(particle_t * particle, double Fx, double Fy, cell * cells, long ncside, int processId, long cellIndex){
 
-    printf("%d B|| px %0.2f py %0.2f m %0.2f ci %d\n", processId, particle->x, particle->y, particle->m, cellIndex);
+//    printf("%d B|| px %0.2f py %0.2f m %0.2f ci %d\n", processId, particle->x, particle->y, particle->m, cellIndex);
     particle->alreadyMoved = 1;
     double acceleration_x = Fx/particle->m;
     double acceleration_y = Fy/particle->m;
@@ -484,7 +473,6 @@ void update_particle_position(particle_t * particle, double Fx, double Fy, cell 
 
  //   printf("%d A|| px %0.2f py %0.2f ci %d\n", processId, particle->x, particle->y, cellIndex);
     //Since the particles may come from another process
-
      move_particle(particle, cells, ncside, cellIndex, processId, cellIndex);
 }
 
@@ -545,21 +533,16 @@ void compute_force_and_update_particles(cell *cells, long ncside, int processId)
         int neighboursListIndex = 0;
         for (int row = -1; row < 2; row++) {
             for (int column = -1; column < 2; column++) {
-//                neighboursList[neighboursListIndex].particles[0].x = 1;
-//                printf("getCell \n");
                 get_cell(processId, row + cellY, column + cellX, cells, &neighboursList[neighboursListIndex++], ncside);
 //                if(neighboursList[neighboursListIndex-1].nParticles > 0) neighboursList[neighboursListIndex-1].particles[0].x = 1;
-//                printf("after PID %d CI %d NI %d| X %0.2f Y %0.2f\n",processId, cellIndex, neighboursListIndex-1, neighboursList[neighboursListIndex-1].x, neighboursList[neighboursListIndex-1].y);
-
             }
         }
-
 //        for (neighboursListIndex = 0; neighboursListIndex < 9; neighboursListIndex++) {
 //            printf("PID %d | NI %d NP %d\n", processId, neighboursListIndex, neighboursList[neighboursListIndex].nParticles);
 //        }
 
         for(long long particleIndex = 0; particleIndex < currCell->nParticles; particleIndex++) {
-            printf("CHECK NUMBER PART | PID %d | CELL INDEX: %d | NUMBER OF PART: %d\n", processId, cellIndex, currCell->nParticles);
+//            printf("CHECK NUMBER PART | PID %d | CELL INDEX: %d | NUMBER OF PART: %d\n", processId, cellIndex, currCell->nParticles);
             particle_t * currentParticle = &(currCell->particles[particleIndex]);
             if (currentParticle->alreadyMoved) continue;
             //resultant force in X and Y
@@ -571,8 +554,9 @@ void compute_force_and_update_particles(cell *cells, long ncside, int processId)
                //         neighboursList[neighboursListIndex].nParticles);
                 if (neighboursList[neighboursListIndex].m == 0)
                     continue;
-//                printf("PID %d CI %d PI %d NI%d(%0.2f, %0.2f) || PX %0.2f NCY %0.2f\n",processId, cellIndex, particleIndex, neighboursListIndex,neighboursList[neighboursListIndex].x, neighboursList[neighboursListIndex].y,
-//                       currentParticle.x, currentParticle.y);
+                if(currentParticle->index == 0)
+                    printf("PID %d CI %d PI %d NI%d(%0.2f, %0.2f, m = %0.2f) || PX %0.2f PY %0.2f\n",processId, cellIndex, particleIndex, neighboursListIndex,neighboursList[neighboursListIndex].x, neighboursList[neighboursListIndex].y, neighboursList[neighboursListIndex].m,
+                           currentParticle->x, currentParticle->y);
 
                 //compute angle
                 double delta_x = neighboursList[neighboursListIndex].x - currentParticle->x;
@@ -585,52 +569,11 @@ void compute_force_and_update_particles(cell *cells, long ncside, int processId)
                 Fy += force * sin(vector_angle);
             }
 //            printf("update particle PID %d ||| CI %d\n", processId, cellIndex);
+
             update_particle_position(currentParticle, Fx, Fy, cells, ncside, processId, cellIndex);
         }
 //        printf("PID %d CI %d\n", processId, cellIndex);
     }
-
-//    printf("PID %d completed\n", processId);
-
-   /* //iterate all particles
-    for(long particleIndex = BLOCK_LOW(processId, NUMBER_OF_PROCESSES, particlesLength);
-            particleIndex <= BLOCK_HIGH(processId, NUMBER_OF_PROCESSES, particlesLength);
-            particleIndex++){
-            
-        //get the coordinates of the cell where the particle is located
-        long long cell_x = particles[particleIndex].cellX;
-        long long cell_y = particles[particleIndex].cellY;
-
-        //resultant force in X and Y
-        double Fx = 0;
-        double Fy = 0;
-
-        // iterate all the 9 mass cells around the particle
-        for(int row = -1; row < 2; row++){
-            for(int column = -1; column < 2; column++){
-                //get the neighbor cell in the coordinates cellMatrix = create_grid(particles, n_part, ncside);(row, column)
-                cell created_neighbor_cell;
-                cell * neighbor_cell = get_cell(row + cell_x, column + cell_y, cells, &created_neighbor_cell, ncside);
-
-                //if that cell doesn't have any particle, no central mass will exist, so we ignore
-                if(neighbor_cell->m == 0)
-                    continue;
-
-                //compute angle
-                double delta_x = neighbor_cell->x - particles[particleIndex].x;
-                double delta_y = neighbor_cell->y - particles[particleIndex].y;
-                double vector_angle = atan2(delta_y, delta_x);
-
-                //compute force
-                double force = compute_magnitude_force(&particles[particleIndex], neighbor_cell);
-                Fx += force * cos(vector_angle);
-                Fy += force * sin(vector_angle);
-            }
-        }
-
-        //update the particle position
-        update_particle_position(&particles[particleIndex], Fx, Fy, cells, ncside, processId);
-    }*/
 }
 
 void reduceOverallCellsMatrix (cell * in, cell * out, int *len , MPI_Datatype *datatype){
@@ -718,6 +661,7 @@ int main(int args_length, char* args[]) {
     MPI_Comm_size(MPI_COMM_WORLD, &NUMBER_OF_PROCESSES);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
+    
     TOTAL_ELEMENTS = NUMBER_OF_ELEMENTS(rank, NUMBER_OF_PROCESSES, ncside * ncside, ncside) + (ncside * NUMBER_OF_GHOST_ROWS * 2);
 
     //Type & Operations Setup
@@ -731,7 +675,7 @@ int main(int args_length, char* args[]) {
      *   |  Top Ghost Row  |  Process's cells  |  Bottom Ghost Row  |
      *    ----------------------------------------------------------
      */
-    printf("Allocating for %d, %d cells\n", rank, NUMBER_OF_ELEMENTS(rank, NUMBER_OF_PROCESSES, ncside * ncside, ncside) + (ncside * NUMBER_OF_GHOST_ROWS * 2));
+    printf("Allocating for %d, %d cells (NP %d)\n", rank, NUMBER_OF_ELEMENTS(rank, NUMBER_OF_PROCESSES, ncside * ncside, ncside) + (ncside * NUMBER_OF_GHOST_ROWS * 2), NUMBER_OF_PROCESSES);
     cell * cellMatrix = (cell*) calloc(TOTAL_ELEMENTS, sizeof(cell));
 
     if(rank==0){
@@ -759,42 +703,33 @@ int main(int args_length, char* args[]) {
     }*/
 
     for(int i = 0; i < iterations; i++){
+//        for (long cellIndex = ncside; cellIndex < TOTAL_ELEMENTS - ncside; cellIndex++){
+//            for(long long particleIndex = 0; particleIndex < cellMatrix[cellIndex].nParticles; particleIndex++){
+//                printf("PID %d CI %d PI %d PRI %d||| px %0.2f  py %0.2f\n", rank, cellIndex, particleIndex, cellMatrix[cellIndex].particles[particleIndex].index, cellMatrix[cellIndex].particles[particleIndex].x, cellMatrix[cellIndex].particles[particleIndex].y);
+//            }
+//        }
 
         //To simplify the index treatment (to start with 0) the cells matrix that goes through parameter omits the top ghost row
         compute_cell_center_mass(&cellMatrix[ncside * NUMBER_OF_GHOST_ROWS], ncside, rank);
 
-        for (long cellIndex = ncside; cellIndex < TOTAL_ELEMENTS - ncside; cellIndex++){
-            for(long long particleIndex = 0; particleIndex < cellMatrix[cellIndex].nParticles; particleIndex++){
-              //  printf("PID %d CI %d PI %d||| px %0.2f  py %0.2f\n", rank, cellIndex, particleIndex, cellMatrix[cellIndex].particles[particleIndex].x, cellMatrix[cellIndex].particles[particleIndex].y);
-            }
-        }
-
-
         compute_force_and_update_particles(cellMatrix, ncside, rank);
-    }
 
-
-    int found = 0;
-    for (long cellIndex = ncside * NUMBER_OF_GHOST_ROWS; !found && cellIndex < TOTAL_ELEMENTS - (ncside * NUMBER_OF_GHOST_ROWS); cellIndex++){
-        for(long long particleIndex = 0;!found && particleIndex < cellMatrix[cellIndex].nParticles; particleIndex++){
-            if(cellMatrix[cellIndex].particles[particleIndex].index == 0){
-                printf("make %0.2f %0.2f \n", cellMatrix[cellIndex].particles[particleIndex].x, cellMatrix[cellIndex].particles[particleIndex].y);
-                found = 1;
+        int found = 0;
+        for (long cellIndex = ncside * NUMBER_OF_GHOST_ROWS; !found && cellIndex < TOTAL_ELEMENTS - (ncside * NUMBER_OF_GHOST_ROWS); cellIndex++){
+            for(long long particleIndex = 0;!found && particleIndex < cellMatrix[cellIndex].nParticles; particleIndex++){
+                if(cellMatrix[cellIndex].particles[particleIndex].index == 0){
+                    printf("%0.2f %0.2f \n", cellMatrix[cellIndex].particles[particleIndex].x, cellMatrix[cellIndex].particles[particleIndex].y);
+                    found = 1;
+                }
             }
         }
     }
+
+
+
 //    compute_overall_center_mass(cellMatrix, ncside, rank);
 
     MPI_Finalize();
-
-/**
-    printf("END\n");    
-    for(int i = 0; i < n_part; i++){
-        printf("%d Process | Particle %d %0.2f %0.2f\n", me, i, particles[0].x, particles[0].y);
-    }
-
-    printf("END\n");
-    */
    
     free(cellMatrix);
     free(particles);
