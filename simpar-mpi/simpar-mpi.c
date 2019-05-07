@@ -42,6 +42,7 @@ typedef struct {
     long cellX;
     long cellY;
     long alreadyMoved; //Flag to check if a particle was already verified
+    long index;
 }particle_t;
 
 typedef struct {
@@ -71,6 +72,9 @@ void init_particles(long seed, long ncside, long long n_part, particle_t *par)
         par[i].vy = RND0_1 / ncside / 10.0;
 
         par[i].m = RND0_1 * ncside / (G * 1e6 * n_part);
+
+        //our
+        par[i].index = i;
     }
 }
 
@@ -99,7 +103,7 @@ void rmvList( cell * cell, particle_t * particle, int pid){
          printf("\t\t/!!!!!!!!!!!\\ A particle WAS removed as it should be\n");
             return;
     }
-   // printf("\t\t/!\\ A particle was not removed as it should be\n");
+    printf("\t\t/!\\ A particle was not removed as it should be\n");
 }
 
 void addList(cell * cell, particle_t * particle){
@@ -108,9 +112,16 @@ void addList(cell * cell, particle_t * particle){
         printf("Dentro do if - Allocated space %d | Number of particles %d\n",cell->allocatedSpace, cell->nParticles );
         cell->particles = (particle_t * )realloc(cell->particles, cell->allocatedSpace * sizeof(particle_t));
     }
+    printf("Particle m: %0.2f | x: %0.2f | %0.2f\n", particle->m, particle->x, particle->y);
+    //double m = cell->particles[cell->nParticles].m;
     printf("Fora do if - Allocated space %d | Number of particles %d\n",cell->allocatedSpace, cell->nParticles );
+    //for(int i = 0; i < cell->nParticles; i++)
+     //   printf("")
+
     cell->particles[cell->nParticles] = *particle;
+    //printf("END OF METHOD Fora do if - Allocated space %d | Number of particles %d\n",cell->allocatedSpace, cell->nParticles );
     cell->nParticles++;
+    printf("END OF ADDLIST - Allocated space %d | Number of particles %d\n",cell->allocatedSpace, cell->nParticles );
 }
 
 /**
@@ -148,9 +159,13 @@ void move_particle(particle_t *particle, cell * cells, long ncside, long oldCell
     int x = particle->x/sizeCell;
     long globalCellIndex =  y*ncside + x;
 
-    if(globalCellIndex == oldCellIndex) return;
+
 
     long localCellIndex = globalCellIndex - BLOCK_LOW(processId, NUMBER_OF_PROCESSES, ncside * ncside);
+    localCellIndex +=8;
+    if(localCellIndex == oldCellIndex) return;
+
+    printf("CHECK GLOBAL INDEX | PID: %d | Global Index: %d | Local Index: %d | Old Index: %d\n", processId, globalCellIndex, localCellIndex, oldCellIndex);
 
     if(particle->y >= 0 && particle->y <= MAX_COORDINATES_VALUE) {
         printf("ENTROU NO ADD | PID %d || lets add/remove x %0.2f y %0.2f on ci%d (rci %d) gi %d li %d \n",processId, particle->x, particle->y, oldCellIndex, ci, globalCellIndex, localCellIndex);
@@ -158,8 +173,6 @@ void move_particle(particle_t *particle, cell * cells, long ncside, long oldCell
     }
     printf("%d || lets remove x %0.2f y %0.2f on ci%d (rci %d) gi %d li %d \n",processId, particle->x, particle->y, oldCellIndex, ci, globalCellIndex, localCellIndex);
     rmvList( &cells[oldCellIndex], particle, processId );
-
-
 }
 
 /**
@@ -199,13 +212,21 @@ void clean_cells(cell * cells, long ncside, int processId){
  * @return Matrix of cells and update the matrix coordenates of each particle
  */
 cell * create_grid(particle_t * particles, long long numberOfParticles, cell * cells, long ncside, int processId){
+
     for (long cellIndex = 0; cellIndex < TOTAL_ELEMENTS; cellIndex++){
+        //printf("CREATE GRID | PID: %d | Cell Index: %d | Number of Particles: %d\n", processId, cellIndex, cells[cellIndex].nParticles);
         cells[cellIndex].particles = (particle_t *)calloc(1, sizeof(particle_t));
         cells[cellIndex].allocatedSpace = 1;
     }
 
     for(long long particleIndex = 0; particleIndex < numberOfParticles; particleIndex++){
         update_particle(&particles[particleIndex], &cells[ncside * NUMBER_OF_GHOST_ROWS], ncside, processId);
+    }
+
+    for (long cellIndex = 0; cellIndex < TOTAL_ELEMENTS; cellIndex++){
+        printf("--- AFTER CREATE GRID | PID: %d | Cell Index: %d | Number of Particles: %d\n", processId, cellIndex, cells[cellIndex].nParticles);
+        //cells[cellIndex].particles = (particle_t *)calloc(1, sizeof(particle_t));
+        //cells[cellIndex].allocatedSpace = 1;
     }
 }
 
@@ -548,7 +569,7 @@ void compute_force_and_update_particles(cell *cells, long ncside, int processId)
 //        }
 
         for(long long particleIndex = 0; particleIndex < currCell->nParticles; particleIndex++) {
-            printf("CHECK NUMBER PART | PID %d | NUMBER OF PART: %d\n", processId, currCell->nParticles);
+            printf("CHECK NUMBER PART | PID %d | CELL INDEX: %d | NUMBER OF PART: %d\n", processId, cellIndex, currCell->nParticles);
             particle_t * currentParticle = &(currCell->particles[particleIndex]);
             if (currentParticle->alreadyMoved) continue;
             //resultant force in X and Y
@@ -672,7 +693,7 @@ void mapCellToMPI(MPI_Datatype * newType){
 }
 
 void mapParticleToMPI(MPI_Datatype * newType){
-    int blocklens[] = {5 /*doubles*/,3 /*long*/};
+    int blocklens[] = {5 /*doubles*/,4 /*long*/};
     MPI_Aint extentDouble, extentLong;
     MPI_Type_extent(MPI_DOUBLE, &extentDouble);
     MPI_Aint indices[] = {0, 5 * extentDouble /* we have 5 doubles */};
