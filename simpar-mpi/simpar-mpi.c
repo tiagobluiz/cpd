@@ -162,7 +162,7 @@ void move_particle(particle_t *particle, cell * cells, long ncside, long oldCell
 
 
     long localCellIndex = globalCellIndex - BLOCK_LOW(processId, NUMBER_OF_PROCESSES, ncside * ncside);
-    localCellIndex +=8;
+    localCellIndex += ncside * NUMBER_OF_GHOST_ROWS;
     if(localCellIndex == oldCellIndex) return;
 
     printf("CHECK GLOBAL INDEX | PID: %d | Global Index: %d | Local Index: %d | Old Index: %d\n", processId, globalCellIndex, localCellIndex, oldCellIndex);
