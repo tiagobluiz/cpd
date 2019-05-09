@@ -67,7 +67,7 @@ void init_particles(long seed, long ncside, long long n_part, particle_t *par)
     }
 }
 
-void rmvList( cell * cell, particle_t * particle, int pid){
+void rmvList( cell * cell, long oldParticleArrayIndex){
     if(oldParticleArrayIndex + 1 < cell->nParticles){
         memcpy(&cell->particles[oldParticleArrayIndex], &cell->particles[cell->nParticles - 1], sizeof(particle_t));
         cell->particles[oldParticleArrayIndex].arrayIndex = oldParticleArrayIndex;
@@ -144,7 +144,7 @@ void update_particle(particle_t *particle, cell * cells, long ncside, int proces
  * @param ncside    The number of cells on each side of the matrix of cells
  */
 void move_particle(particle_t *particle, cell * cells, long ncside, long oldCellIndex, int processId, long ci){
-    //Verifies if this cell belongs to this processor
+        //Verifies if this cell belongs to this processor
     double sizeCell = MAX_COORDINATES_VALUE/ncside;
     int y = particle->y/sizeCell;
     int x = particle->x/sizeCell;
@@ -153,13 +153,14 @@ void move_particle(particle_t *particle, cell * cells, long ncside, long oldCell
     long localCellIndex = globalCellIndex - BLOCK_LOW(processId, NUMBER_OF_PROCESSES, ncside) + ncside * NUMBER_OF_GHOST_ROWS;
     if(localCellIndex == oldCellIndex) return;
 
+    long oldParticleArrayIndex = particle->arrayIndex;
     if((globalCellIndex >= BLOCK_LOW(processId,NUMBER_OF_PROCESSES, ncside)) &&
     (globalCellIndex <= BLOCK_HIGH( processId, NUMBER_OF_PROCESSES, ncside))) {
 //        printf("ENTROU NO ADD | PID %d || lets add/remove x %0.2f y %0.2f on ci%d (%0.2f , %0.2f) gi %d li %d \n",processId, particle->x, particle->y, oldCellIndex, lc, hc, globalCellIndex, localCellIndex);
         addList(&cells[localCellIndex], particle);
     }
 //    printf("%d || lets remove x %0.2f y %0.2f on ci%d (rci %d) gi %d li %d \n",processId, particle->x, particle->y, oldCellIndex, ci, globalCellIndex, localCellIndex);
-    rmvList( &cells[oldCellIndex], particle, processId );
+    rmvList( &cells[oldCellIndex], oldParticleArrayIndex);
 }
 
 /**
