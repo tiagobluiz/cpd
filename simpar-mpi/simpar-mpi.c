@@ -63,7 +63,7 @@ void init_particles(long seed, long ncside, long long n_part, particle_t *par)
         par[i].m = RND0_1 * ncside / (G * 1e6 * n_part);
 
         //our
-        par[i].index = i;
+        par[i].creationIndex = i;
     }
 }
 
@@ -108,7 +108,7 @@ void addList(cell * cell, particle_t * particle){
     }
 //    printf("Particle m: %0.2f | x: %0.2f | %0.2f\n", particle->m, particle->x, particle->y);
     //for(int i = 0; i < cell->nParticles; i++)
-     //   printf("")
+    //   printf("")
 
     particle->arrayIndex = cell->nParticles;
     cell->particles[cell->nParticles] = *particle;
@@ -129,7 +129,7 @@ void update_particle(particle_t *particle, cell * cells, long ncside, int proces
     long globalCellIndex = newCellY * ncside + newCellX;
 
     if(!(globalCellIndex >= BLOCK_LOW(processId, NUMBER_OF_PROCESSES, ncside) &&
-            globalCellIndex <= BLOCK_HIGH(processId, NUMBER_OF_PROCESSES, ncside))) return;
+         globalCellIndex <= BLOCK_HIGH(processId, NUMBER_OF_PROCESSES, ncside))) return;
 
 
     int localCellIndex = globalCellIndex - BLOCK_LOW(processId, NUMBER_OF_PROCESSES, ncside);
@@ -144,7 +144,7 @@ void update_particle(particle_t *particle, cell * cells, long ncside, int proces
  * @param ncside    The number of cells on each side of the matrix of cells
  */
 void move_particle(particle_t *particle, cell * cells, long ncside, long oldCellIndex, int processId, long ci){
-        //Verifies if this cell belongs to this processor
+    //Verifies if this cell belongs to this processor
     double sizeCell = MAX_COORDINATES_VALUE/ncside;
     int y = particle->y/sizeCell;
     int x = particle->x/sizeCell;
@@ -155,7 +155,7 @@ void move_particle(particle_t *particle, cell * cells, long ncside, long oldCell
 
     long oldParticleArrayIndex = particle->arrayIndex;
     if((globalCellIndex >= BLOCK_LOW(processId,NUMBER_OF_PROCESSES, ncside)) &&
-    (globalCellIndex <= BLOCK_HIGH( processId, NUMBER_OF_PROCESSES, ncside))) {
+       (globalCellIndex <= BLOCK_HIGH( processId, NUMBER_OF_PROCESSES, ncside))) {
 //        printf("ENTROU NO ADD | PID %d || lets add/remove x %0.2f y %0.2f on ci%d (%0.2f , %0.2f) gi %d li %d \n",processId, particle->x, particle->y, oldCellIndex, lc, hc, globalCellIndex, localCellIndex);
         addList(&cells[localCellIndex], particle);
     }
@@ -191,11 +191,11 @@ void clean_cells(cell * cells, long ncside, int processId){
  */
 cell * create_grid(particle_t * particles, long long numberOfParticles, cell * cells, long ncside, int processId){
 
-    /*for (long cellIndex = 0; cellIndex < TOTAL_ELEMENTS; cellIndex++){
-        //printf("CREATE GRID | PID: %d | Cell Index: %d | Number of Particles: %d\n", processId, cellIndex, cells[cellIndex].nParticles);
-        cells[cellIndex].particles = (particle_t *)calloc(1, sizeof(particle_t));
-        cells[cellIndex].allocatedSpace = 1;
-    }*/
+//    for (long cellIndex = 0; cellIndex < TOTAL_ELEMENTS; cellIndex++){
+//        //printf("CREATE GRID | PID: %d | Cell Index: %d | Number of Particles: %d\n", processId, cellIndex, cells[cellIndex].nParticles);
+//        cells[cellIndex].particles = (particle_t *)calloc(1, sizeof(particle_t));
+//        cells[cellIndex].allocatedSpace = 1;
+//    }
 
     for(long long particleIndex = 0; particleIndex < numberOfParticles; particleIndex++){
         update_particle(&particles[particleIndex], &cells[ncside * NUMBER_OF_GHOST_ROWS], ncside, processId);
@@ -232,49 +232,55 @@ cell * create_grid(particle_t * particles, long long numberOfParticles, cell * c
 void exchangeGhostRows (cell * cells, long ncside, int senderProcessId) {
 
     if (NUMBER_OF_PROCESSES == 1) return; // If it is only one processor, there is no need for communication
- /*  for(int i = 0 ; i < ncside * NUMBER_OF_GHOST_ROWS; i ++){
-        printf("PID %d  | TOP GHOST SENT BY  |  CI %d  | NP: %d \n", senderProcessId, i, cells[i].nParticles);
-    }
+    /*  for(int i = 0 ; i < ncside * NUMBER_OF_GHOST_ROWS; i ++){
+           printf("PID %d  | TOP GHOST SENT BY  |  CI %d  | NP: %d \n", senderProcessId, i, cells[i].nParticles);
+       }
 
-    cell * pointer = &cells[NUMBER_OF_ELEMENTS(senderProcessId, NUMBER_OF_PROCESSES, ncside) -
-                            (ncside * NUMBER_OF_GHOST_ROWS)];
-    for(int i = 0 ; i < ncside * NUMBER_OF_GHOST_ROWS; i ++){
-        printf("PID %d  | BOT GHOST SENT BY  |  CI %d  | NP: %d \n", senderProcessId, i, pointer[i].nParticles);
-    }*/
+       cell * pointer = &cells[NUMBER_OF_ELEMENTS(senderProcessId, NUMBER_OF_PROCESSES, ncside) -
+                               (ncside * NUMBER_OF_GHOST_ROWS)];
+       for(int i = 0 ; i < ncside * NUMBER_OF_GHOST_ROWS; i ++){
+           printf("PID %d  | BOT GHOST SENT BY  |  CI %d  | NP: %d \n", senderProcessId, i, pointer[i].nParticles);
+       }*/
 
     int topProcessId = (senderProcessId - 1 + NUMBER_OF_PROCESSES) % NUMBER_OF_PROCESSES;
     int bottomProcessId = (senderProcessId + 1 + NUMBER_OF_PROCESSES) % NUMBER_OF_PROCESSES;
 
-    MPI_Status statuses[2];
-    MPI_Request requests[2];
+    MPI_Status statuses[4];
+    MPI_Request requests[4];
 
-    cell * topGhostRow = cells - (ncside * NUMBER_OF_GHOST_ROWS);
+    cell * topGhostRow = (cells - (ncside * NUMBER_OF_GHOST_ROWS));
     cell * bottomGhostRow = cells + NUMBER_OF_ELEMENTS(senderProcessId, NUMBER_OF_PROCESSES, ncside);
 //    printf("sPID %d bPID %d NOE %d || p1 %x p2 %x\n", senderProcessId, bottomProcessId, NUMBER_OF_ELEMENTS(bottomProcessId, NUMBER_OF_PROCESSES, ncside), bottomGhostRow - (ncside * NUMBER_OF_GHOST_ROWS), pointer);
 
 //    printf("PID %d  | BOT | NP: %d NOF %d\n", senderProcessId, bottomGhostRow->nParticles, NUMBER_OF_ELEMENTS(bottomProcessId, NUMBER_OF_PROCESSES, ncside));
 
+    printf("PID %d Before 1st isend\n", senderProcessId);
+
     MPI_Isend(cells, ncside * NUMBER_OF_GHOST_ROWS, cellMPIType, topProcessId,
-             SEND_TOP_GHOST_ROW_TAG, MPI_COMM_WORLD, &requests[0]);
+              SEND_TOP_GHOST_ROW_TAG, MPI_COMM_WORLD, &requests[0]);
 
+    printf("PID %d Before 2nd isend\n", senderProcessId);
     MPI_Isend(bottomGhostRow - (ncside * NUMBER_OF_GHOST_ROWS),ncside * NUMBER_OF_GHOST_ROWS, cellMPIType, bottomProcessId,
-             SEND_BOT_GHOST_ROW_TAG, MPI_COMM_WORLD, &requests[1]);
+              SEND_BOT_GHOST_ROW_TAG, MPI_COMM_WORLD, &requests[1]);
 
+    printf("PID %d Before 1st recv\n", senderProcessId);
+    MPI_Recv(topGhostRow, ncside * NUMBER_OF_GHOST_ROWS, cellMPIType, topProcessId,
+             SEND_BOT_GHOST_ROW_TAG, MPI_COMM_WORLD, &statuses[0]);
+
+    printf("PID %d Before 2nd recv\n", senderProcessId);
     MPI_Recv(bottomGhostRow, ncside * NUMBER_OF_GHOST_ROWS, cellMPIType, bottomProcessId,
              SEND_TOP_GHOST_ROW_TAG, MPI_COMM_WORLD, &statuses[1]);
-    MPI_Recv(topGhostRow, ncside * NUMBER_OF_GHOST_ROWS, cellMPIType, topProcessId,
-              SEND_BOT_GHOST_ROW_TAG, MPI_COMM_WORLD, &statuses[0]);
+
+    printf("PID %d After receives\n", senderProcessId);
+
+//    MPI_Waitall(2, requests, statuses);
+//    for (int statusesIndex = 0; statusesIndex < 2; statusesIndex++)
+//    printf("Sender Id: %d | Status index: %d | Cancelled: %d | Count: %d\n",
+//           senderProcessId, statusesIndex, statuses[statusesIndex]._cancelled, statuses[statusesIndex]._ucount);
 
 
-
-    MPI_Waitall(2, requests, statuses);
-    for (int statusesIndex = 0; statusesIndex < 2; statusesIndex++)
-    printf("Sender Id: %d | Status index: %d | Cancelled: %d | Count: %d\n",
-           senderProcessId, statusesIndex, statuses[statusesIndex]._cancelled, statuses[statusesIndex]._ucount);
-
-
-/*    printf("---------------- after wait all--------\n");
-   for(int i = 0 ; i < ncside * NUMBER_OF_GHOST_ROWS; i ++){
+//    printf("---------------- after wait all--------\n");
+/*   for(int i = 0 ; i < ncside * NUMBER_OF_GHOST_ROWS; i ++){
         printf("PID %d  | TOP GHOST RECV BY %d |  CI %d  | NP: %d \n", senderProcessId, topProcessId, i, topGhostRow[i].nParticles);
     }
 
@@ -295,7 +301,7 @@ void exchangeGhostRows (cell * cells, long ncside, int senderProcessId) {
         countTopParticlesToReceive += topParticlesToReceive[cellIndex].nParticles;
         countDownParticlesToReceive += downParticlesToReceive[cellIndex].nParticles;
     }
-    printf("PID %d || CountTopPaRecv %d, CountTopPaSend %d || CountDownPaRecv %d CountDownPaSend %d\n", senderProcessId,
+    printf("PID %d || CTPR %d, CTPS %d || CDPR %d CDPS %d\n", senderProcessId,
            countTopParticlesToReceive, countTopParticlesToSend,
            countDownParticlesToReceive, countDownParticlesToSend);
 
@@ -327,32 +333,43 @@ void exchangeGhostRows (cell * cells, long ncside, int senderProcessId) {
 //    printf("here4 by %d\n", senderProcessId);
     particle_t *topParticlesToReceiveBuffer = calloc(countTopParticlesToReceive, sizeof(particle_t));//[countTopParticlesToReceive];
     particle_t *downParticlesToReceiveBuffer = calloc(countDownParticlesToReceive, sizeof(particle_t)); //[countDownParticlesToReceive];
+
 //    printf("here4 sID %d tID %d count %d\n", senderProcessId, topProcessId, countTopParticlesToSend);
-
-
-
-
-    printf("pid %d after 1st wait toppid %d\n", senderProcessId, topProcessId);
-    MPI_Irecv(topParticlesToReceiveBuffer, countTopParticlesToReceive, particleMPIType, topProcessId,
+    MPI_Isend(topParticlesToSendBuffer, countTopParticlesToSend, particleMPIType, topProcessId,
+              SEND_TOP_GHOST_PARTICLES_TAG, MPI_COMM_WORLD, &requests[0]);
+    MPI_Isend(downParticlesToSendBuffer, countDownParticlesToSend, particleMPIType, bottomProcessId,
               SEND_BOT_GHOST_PARTICLES_TAG, MPI_COMM_WORLD, &requests[1]);
 
-    printf("pid %d after 2nd wait botpid %d\n", senderProcessId, bottomProcessId);
-    MPI_Irecv(downParticlesToReceiveBuffer, countDownParticlesToReceive, particleMPIType, bottomProcessId,
-             SEND_TOP_GHOST_PARTICLES_TAG, MPI_COMM_WORLD, &requests[0]);
-    printf("pid %d after Receives Particles wait \n", senderProcessId);
 
-    printf("PId %d 1st send to top %d\n",senderProcessId, topProcessId);
-    MPI_Send(topParticlesToSendBuffer, countTopParticlesToSend, particleMPIType, topProcessId,
-             SEND_TOP_GHOST_PARTICLES_TAG, MPI_COMM_WORLD);//, &requests[0]);
+    MPI_Recv(topParticlesToReceiveBuffer, countTopParticlesToReceive, particleMPIType, topProcessId,
+             SEND_BOT_GHOST_PARTICLES_TAG, MPI_COMM_WORLD, &statuses[0]);
+    MPI_Recv(downParticlesToReceiveBuffer, countDownParticlesToReceive, particleMPIType, bottomProcessId,
+             SEND_TOP_GHOST_PARTICLES_TAG, MPI_COMM_WORLD, &statuses[1]);
 
-    printf("PId %d 2nd send to bot %d\n",senderProcessId, bottomProcessId);
-    MPI_Send(downParticlesToSendBuffer, countDownParticlesToSend, particleMPIType, bottomProcessId,
-             SEND_BOT_GHOST_PARTICLES_TAG, MPI_COMM_WORLD);//, &requests[1]);
+//    printf("here4.1 sID %d bID %d count %d\n", senderProcessId, bottomProcessId, countDownParticlesToSend);
 
-    printf("here4.1 sID %d bID %d count %d\n", senderProcessId, bottomProcessId, countDownParticlesToSend);
 
-    MPI_Waitall(2, requests, statuses);
-    printf("here6 by %d\n", senderProcessId);
+//    if(senderProcessId % 2 == 0){
+//        MPI_Sendrecv(topParticlesToSendBuffer, countTopParticlesToSend, particleMPIType, topProcessId, SEND_TOP_GHOST_PARTICLES_TAG,
+//                     downParticlesToReceiveBuffer, countDownParticlesToReceive, particleMPIType, bottomProcessId, SEND_TOP_GHOST_PARTICLES_TAG,
+//                     MPI_COMM_WORLD, &statuses[0]);
+//        printf("here5 by %d\n", senderProcessId);
+//        MPI_Sendrecv(downParticlesToSendBuffer, countDownParticlesToSend, particleMPIType, bottomProcessId, SEND_BOT_GHOST_PARTICLES_TAG,
+//                     topParticlesToReceiveBuffer, countTopParticlesToReceive, particleMPIType, topProcessId, SEND_BOT_GHOST_PARTICLES_TAG,
+//                     MPI_COMM_WORLD, &statuses[1]);
+//    } else{
+//        MPI_Sendrecv(downParticlesToSendBuffer, countDownParticlesToSend, particleMPIType, bottomProcessId, SEND_BOT_GHOST_PARTICLES_TAG,
+//                     topParticlesToReceiveBuffer, countTopParticlesToReceive, particleMPIType, topProcessId, SEND_BOT_GHOST_PARTICLES_TAG,
+//                     MPI_COMM_WORLD, &statuses[1]);
+//        MPI_Sendrecv(topParticlesToSendBuffer, countTopParticlesToSend, particleMPIType, topProcessId, SEND_TOP_GHOST_PARTICLES_TAG,
+//                     downParticlesToReceiveBuffer, countDownParticlesToReceive, particleMPIType, bottomProcessId, SEND_TOP_GHOST_PARTICLES_TAG,
+//                     MPI_COMM_WORLD, &statuses[0]);
+//    }
+
+
+
+//    MPI_Waitall(2, requests, statuses);
+//    printf("here6 by %d\n", senderProcessId);
 
 
     /*
@@ -378,7 +395,7 @@ void exchangeGhostRows (cell * cells, long ncside, int senderProcessId) {
 
     particle_t * pointerTopParticlesToReceiveBuffer = topParticlesToReceiveBuffer;
     particle_t * pointerDownParticlesToReceiveBuffer = downParticlesToReceiveBuffer;
-    
+
     for(long cellIndex = 0; cellIndex < ncside; cellIndex++){
 //        topGhostRow[cellIndex].allocatedSpace = 1;
 //        topGhostRow[cellIndex].nParticles = 0;
@@ -402,7 +419,7 @@ void exchangeGhostRows (cell * cells, long ncside, int senderProcessId) {
         memcpy(downParticlesToReceive[cellIndex].particles, pointerDownParticlesToReceiveBuffer, downParticlesToReceive[cellIndex].nParticles * sizeof(particle_t));
         pointerDownParticlesToReceiveBuffer += downParticlesToReceive[cellIndex].nParticles;
         for(long long particleIndex = 0;
-        (senderProcessId == NUMBER_OF_PROCESSES - 1) && particleIndex < downParticlesToReceive[cellIndex].nParticles; particleIndex++){
+            (senderProcessId == NUMBER_OF_PROCESSES - 1) && particleIndex < downParticlesToReceive[cellIndex].nParticles; particleIndex++){
             downParticlesToReceive[cellIndex].particles[particleIndex].y += MAX_COORDINATES_VALUE;
         }
     }
@@ -433,7 +450,7 @@ void compute_cell_center_mass(cell * cells, long ncside, int processId) {
     clean_cells(cells, ncside, processId);
 
     for (long cellIndex = 0; cellIndex < NUMBER_OF_ELEMENTS(processId, NUMBER_OF_PROCESSES, ncside);
-    cellIndex++){
+         cellIndex++){
         cell currCell = cells[cellIndex];
         if(currCell.nParticles > 0){ //avoid div by 0
             for(long long particleIndex = 0; particleIndex < currCell.nParticles; particleIndex++) {
@@ -451,10 +468,6 @@ void compute_cell_center_mass(cell * cells, long ncside, int processId) {
 
     exchangeGhostRows(cells, ncside, processId);
 
-    for (long cellIndex = -ncside; cellIndex < NUMBER_OF_ELEMENTS(processId, NUMBER_OF_PROCESSES, ncside)+ncside;
-         cellIndex++){
-//        printf("PID %d CI %d X %0.2f\n", processId, cellIndex, cells[cellIndex].x);
-    }
 //    printf("PID %d center mass\n", processId);
 }
 
@@ -496,9 +509,9 @@ void update_particle_position(particle_t * particle, double Fx, double Fy, cell 
     x = fmod(x, MAX_COORDINATES_VALUE);
     particle->x = x < 0 ? x + MAX_COORDINATES_VALUE : x;
 
- //   printf("%d A|| px %0.2f py %0.2f ci %d\n", processId, particle->x, particle->y, cellIndex);
+    //   printf("%d A|| px %0.2f py %0.2f ci %d\n", processId, particle->x, particle->y, cellIndex);
     //Since the particles may come from another process
-     move_particle(particle, cells, ncside, cellIndex, processId, cellIndex);
+    move_particle(particle, cells, ncside, cellIndex, processId, cellIndex);
 }
 
 /**
@@ -547,7 +560,7 @@ void get_cell(int pid, long long unbounded_row, long long unbounded_column, cell
  * @param cell_dimension    dimension of each cell
  */
 void compute_force_and_update_particles(cell *cells, long ncside, int processId){
-//    printf("PID %d started moved TOTal elem %d\n", processId, TOTAL_ELEMENTS);
+    printf("PID %d started moved TOTal elem %d\n", processId, TOTAL_ELEMENTS);
     for(long cellIndex = ncside;cellIndex < TOTAL_ELEMENTS - ncside; cellIndex++) {
 //        printf("PID % started for move in %d\n", processId, cellIndex);
         cell * currCell = &cells[cellIndex];
@@ -569,19 +582,16 @@ void compute_force_and_update_particles(cell *cells, long ncside, int processId)
 //        }
 //        printf("PID %d obtained list of neihbours\n", processId);
         for(long long particleIndex = 0; particleIndex < currCell->nParticles; particleIndex++) {
-//            printf("CHECK NUMBER PART | PID %d | CELL INDEX: %d | NUMBER OF PART: %d\n", processId, cellIndex, currCell->nParticles);
             particle_t * currentParticle = &(currCell->particles[particleIndex]);
-//            printf("CHECK2 NUMBER PART | PID %d | CELL INDEX: %d | NUMBER OF PART: %d\n", processId, cellIndex, currCell->nParticles);
-//            printf("CHECK3 NUMBER PART | PID %d | CELL INDEX: %d | NUMBER OF PART: %d | AM %d\n", processId, cellIndex, currCell->nParticles,currCell->particles[particleIndex].alreadyMoved);
             if (currentParticle->alreadyMoved) continue;
-//            printf("CHECK4 NUMBER PART | PID %d | CELL INDEX: %d | NUMBER OF PART: %d\n", processId, cellIndex, currCell->nParticles);
+
             //resultant force in X and Y
             double Fx = 0;
             double Fy = 0;
             for (neighboursListIndex = 0; neighboursListIndex < 9; neighboursListIndex++) {
                 //if that cell doesn't have any particle, no central mass will exist, so we ignore
-               // printf("PID %d  ||  NI %d  ||  NP %d\n", processId, neighboursListIndex,
-               //         neighboursList[neighboursListIndex].nParticles);
+                // printf("PID %d  ||  NI %d  ||  NP %d\n", processId, neighboursListIndex,
+                //         neighboursList[neighboursListIndex].nParticles);
                 if (neighboursList[neighboursListIndex].m == 0)
                     continue;
 //                if(currentParticle->index == 0)
@@ -591,7 +601,7 @@ void compute_force_and_update_particles(cell *cells, long ncside, int processId)
                 //compute angle
                 double delta_x = neighboursList[neighboursListIndex].x - currentParticle->x;
                 double delta_y = neighboursList[neighboursListIndex].y - currentParticle->y;
-                double vector_angle = atan2(delta_y, delta_x);
+                double vector_angle = atan2(delta_y, delta_x); //problem
 
                 //compute force
                 double force = compute_magnitude_force(currentParticle, &neighboursList[neighboursListIndex]);
@@ -621,11 +631,12 @@ void reduceOverallCellsMatrix (cell * in, cell * out, int *len , MPI_Datatype *d
  * @param ncside        number of particles (must match @particles length)
  */
 void compute_overall_center_mass(cell * cells, long ncside, int processId){
+    printf("ENTROU %d\n", processId);
     cell overallCenterMass = {.x=0, .y=0, .m=0};
 
     for(long cellIndex = ncside * NUMBER_OF_GHOST_ROWS;
-    cellIndex < TOTAL_ELEMENTS - (ncside * NUMBER_OF_GHOST_ROWS);
-    cellIndex++) {
+        cellIndex < TOTAL_ELEMENTS - (ncside * NUMBER_OF_GHOST_ROWS);
+        cellIndex++) {
         particle_t * currentParticleList = cells[cellIndex].particles;
         for(long long particleIndex = 0; particleIndex < cells[cellIndex].nParticles; particleIndex++) {
             particle_t currentParticle = currentParticleList[particleIndex];
@@ -636,16 +647,16 @@ void compute_overall_center_mass(cell * cells, long ncside, int processId){
     }
 
     cell outOverallCenterMass = {.x=0, .y=0, .m=0};
-   // printf("Process id: %d  |  %0.2f %0.2f %0.2f \n", processId, overallCenterMass.x, overallCenterMass.y, overallCenterMass.m);
+    // printf("Process id: %d  |  %0.2f %0.2f %0.2f \n", processId, overallCenterMass.x, overallCenterMass.y, overallCenterMass.m);
+
 
     MPI_Reduce(&overallCenterMass, &outOverallCenterMass, 1, cellMPIType, reduceOverallCellOp, 0, MPI_COMM_WORLD);
 
+    outOverallCenterMass.x /= outOverallCenterMass.m;
+    outOverallCenterMass.y /= outOverallCenterMass.m;
 
-    if(processId == 0){
-        outOverallCenterMass.x /= outOverallCenterMass.m;
-        outOverallCenterMass.y /= outOverallCenterMass.m;
+    if(processId == 0)
         printf("%0.2f %0.2f \n", outOverallCenterMass.x, outOverallCenterMass.y);
-    }
 }
 
 void mapCellToMPI(MPI_Datatype * newType){
@@ -659,7 +670,7 @@ void mapCellToMPI(MPI_Datatype * newType){
 }
 
 void mapParticleToMPI(MPI_Datatype * newType){
-    int blocklens[] = {5 /*doubles*/,4 /*long*/};
+    int blocklens[] = {5 /*doubles*/,3 /*long*/};
     MPI_Aint extentDouble, extentLong;
     MPI_Type_extent(MPI_DOUBLE, &extentDouble);
     MPI_Aint indices[] = {0, 5 * extentDouble /* we have 5 doubles */};
@@ -727,8 +738,8 @@ int main(int args_length, char* args[]) {
 //    for(int i = 0; i < n_part; i++)
 //        printf("Process id: %d | Particula %d | %0.2f %0.2f %0.2f \n", rank, i, particles[i].x, particles[i].y, particles[i].m);
     /*
-    for(long particleIndex = BLOCK_LOW(me, NUMBER_OF_PROCESSES, n_part); 
-            particleIndex <= BLOCK_HIGH(me, NUMBER_OF_PROCESSES, n_part); 
+    for(long particleIndex = BLOCK_LOW(me, NUMBER_OF_PROCESSES, n_part);
+            particleIndex <= BLOCK_HIGH(me, NUMBER_OF_PROCESSES, n_part);
             particleIndex++){
         printf("Process id: %d | Particula %d | %0.2f %0.2f %0.2f \n", me, particleIndex, particles[particleIndex].x, particles[particleIndex].y, particles[particleIndex].m);
     }*/
@@ -739,32 +750,31 @@ int main(int args_length, char* args[]) {
 //                printf("PID %d CI %d PI %d PRI %d||| px %0.2f  py %0.2f\n", rank, cellIndex, particleIndex, cellMatrix[cellIndex].particles[particleIndex].index, cellMatrix[cellIndex].particles[particleIndex].x, cellMatrix[cellIndex].particles[particleIndex].y);
 //            }
 //        }
-
+        printf("\t ITERATION %d by %d\n", i, rank);
         //To simplify the index treatment (to start with 0) the cells matrix that goes through parameter omits the top ghost row
         compute_cell_center_mass(&cellMatrix[ncside * NUMBER_OF_GHOST_ROWS], ncside, rank);
 
         compute_force_and_update_particles(cellMatrix, ncside, rank);
+        printf("\t ITERATION %d concluded by %d\n", i, rank);
     }
 
     int found = 0;
     for (long cellIndex = ncside * NUMBER_OF_GHOST_ROWS; !found && cellIndex < TOTAL_ELEMENTS - (ncside * NUMBER_OF_GHOST_ROWS); cellIndex++){
         for(long long particleIndex = 0;!found && particleIndex < cellMatrix[cellIndex].nParticles; particleIndex++){
-            if(cellMatrix[cellIndex].particles[particleIndex].index == 0){
+            if(cellMatrix[cellIndex].particles[particleIndex].creationIndex == 0){
                 printf("%0.2f %0.2f \n", cellMatrix[cellIndex].particles[particleIndex].x, cellMatrix[cellIndex].particles[particleIndex].y);
                 found = 1;
             }
         }
     }
 
-
-
     compute_overall_center_mass(cellMatrix, ncside, rank);
 
     MPI_Finalize();
-   
+
     free(cellMatrix);
     free(particles);
-    
-    
-    
+
+
+
 }
