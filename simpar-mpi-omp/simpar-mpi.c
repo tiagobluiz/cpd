@@ -585,7 +585,6 @@ int main(int args_length, char* args[]) {
         init_particles(seed, ncside, n_part, particles);
     }
 
-
     MPI_Bcast(particles, n_part, particleMPIType, 0, MPI_COMM_WORLD);
 
     // Populates the cell with their particles
@@ -595,17 +594,11 @@ int main(int args_length, char* args[]) {
 
 
     for(int i = 0; i < iterations; i++){
-        printf("%d ITERATION %d\n", rank,i);
         //To simplify the index treatment (to start with 0) the cells matrix that goes through parameter omits the top ghost row
         compute_cell_center_mass(&cellMatrix[ncside * NUMBER_OF_GHOST_ROWS], ncside, rank);
-
-       for (long cellIndex = ncside;cellIndex < TOTAL_ELEMENTS - ncside; cellIndex++){
-//            printf("> %d | CI %d (%0.2f, %0.2f; %0.2f)| NP %d AS %d\n", rank, cellIndex, cellMatrix[cellIndex].x, cellMatrix[cellIndex].y, cellMatrix[cellIndex].m, cellMatrix[cellIndex].nParticles, cellMatrix[cellIndex].allocatedSpace);
-            //for(long long particleIndex = 0;(cellIndex >= ncside && cellIndex < TOTAL_ELEMENTS - ncside) && particleIndex < cellMatrix[cellIndex].nParticles; particleIndex++){
-              //      printf("---> %d | CI %d | PCI %d | %d | PAI %d PX %0.2f PY %0.2f PM %0.2f\n", rank, cellIndex, cellMatrix[cellIndex].particles[particleIndex].creationIndex, i, cellMatrix[cellIndex].particles[particleIndex].arrayIndex, cellMatrix[cellIndex].particles[particleIndex].x, cellMatrix[cellIndex].particles[particleIndex].y, cellMatrix[cellIndex].particles[particleIndex].m);
-            //}
-        }
+        
         compute_force_and_update_particles(cellMatrix, ncside, rank);
+        
         MPI_Barrier(MPI_COMM_WORLD);
     }
 
@@ -620,6 +613,7 @@ int main(int args_length, char* args[]) {
         }
     }
 
+    MPI_Barrier(MPI_COMM_WORLD);
     compute_overall_center_mass(cellMatrix, ncside, rank);
 
     MPI_Finalize();
