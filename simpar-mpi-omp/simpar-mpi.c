@@ -17,7 +17,7 @@
 
 
 int NUMBER_OF_PROCESSES;
-long TOTAL_ELEMENTS, NCSIDE;
+long TOTAL_ELEMENTS;
 
 MPI_Op reduceOverallCellOp;
 MPI_Datatype cellMPIType;
@@ -235,6 +235,7 @@ void exchangeGhostRows (cell * cells, long ncside, int senderProcessId) {
         countDownParticlesToReceive += downParticlesToReceive[cellIndex].nParticles;
     }
 
+    #pragma omp parallel for
     for (long cellIndex = 0; cellIndex < ncside * NUMBER_OF_GHOST_ROWS; cellIndex++){
         if (senderProcessId == 0) topGhostRow[cellIndex].y -= MAX_COORDINATES_VALUE;
         else if (senderProcessId == NUMBER_OF_PROCESSES - 1) bottomGhostRow[cellIndex].y += MAX_COORDINATES_VALUE;
@@ -556,7 +557,7 @@ int main(int args_length, char* args[]) {
     if(args_length == 8) factor = 3;
 
     long seed = strtol(args[1 + factor], NULL, 10);
-    long ncside = NCSIDE = strtol(args[2 + factor], NULL, 10);
+    long ncside = strtol(args[2 + factor], NULL, 10);
     long long n_part = strtol(args[3 + factor], NULL, 10);
     long iterations = strtol(args[4 + factor], NULL, 10);
 
