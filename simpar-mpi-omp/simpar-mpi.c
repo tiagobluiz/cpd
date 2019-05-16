@@ -298,31 +298,28 @@ void exchangeGhostRows (cell * cells, long ncside, int senderProcessId) {
 }
 
 /**
- * Reduces two arrays of cells into one (reduction function of redcell)
+ * Reduces two cells into one (reduction function of cntmassrdc)
  *
- * @param a     accumulated array
- * @param b     incoming array, which will be deallocated from memory
+ * @param a     accumulated value
+ * @param b     incoming value
  */
-cell * reduceCellsMatrix (cell * a, cell * b){
-    for (long cellIndex = 0; cellIndex < TOTAL_ELEMENTS - (NCSIDE * NUMBER_OF_GHOST_ROWS); cellIndex++){
-        a[cellIndex].x += b[cellIndex].x;
-        a[cellIndex].y += b[cellIndex].y;
-        a[cellIndex].m += b[cellIndex].m;
-    }
-    free(b);
+cell reduceCell(cell a, cell b){
+    a.x += b.x;
+    a.y += b.y;
+    a.m += b.m;
     return a;
 }
 
 /**
- * Feeds the redcell reductor with a clean array of cells
+ * Feeds the cntmassrdc reductor with a clean cell
  */
-cell * initMatrix(){
-    return (cell*) calloc(TOTAL_ELEMENTS - (NCSIDE * NUMBER_OF_GHOST_ROWS), sizeof(cell));
+cell initCell(){
+    cell newCell = {x:0, y:0, m:0};
+    return newCell;
 }
-
 #pragma omp declare reduction \
-        (redcell:cell*:omp_out=reduceCellsMatrix(omp_out,omp_in)) \
-        initializer(omp_priv=initMatrix(omp_priv))
+        (cntmass:cell:omp_out=reduceCell(omp_out,omp_in)) \
+        initializer(omp_priv=initCell(omp_priv))
 /**
  * Computes the center mass for each existing cell in grid
  *
@@ -334,20 +331,20 @@ cell * initMatrix(){
  */
 void compute_cell_center_mass(cell * cells, long ncside, int processId) {
     clean_cells(cells, ncside, processId);
-
+    
     for (long cellIndex = 0; cellIndex < NUMBER_OF_ELEMENTS(processId, NUMBER_OF_PROCESSES, ncside);
          cellIndex++){
         cell currCell = cells[cellIndex];
         if(currCell.nParticles > 0){ //avoid div by 0
-            #pragma omp for reduction(redcell:cells)
+            #pragma omp parallel for reduction(cntmass:currCell)
             for(long long particleIndex = 0; particleIndex < currCell.nParticles; particleIndex++) {
                 particle_t * currentParticle = &currCell.particles[particleIndex];
-                cells[cellIndex].x += currentParticle->x * currentParticle->m;
-                cells[cellIndex].y += currentParticle->y * currentParticle->m;
-                cells[cellIndex].m += currentParticle->m;
+                currCell.x += currentParticle->x * currentParticle->m;
+                currCell.y += currentParticle->y * currentParticle->m;
+                currCell.m += currentParticle->m;
             }
-            cells[cellIndex].x /= cells[cellIndex].m;
-            cells[cellIndex].y /= cells[cellIndex].m;
+            currCell.x /= currCell.m;
+            currCell.y /= currCell.m;   
         }
     }
 
@@ -441,6 +438,7 @@ void get_cell(long long unbounded_row, long long unbounded_column, cell *cells, 
  * @param cell_dimension    dimension of each cell
  */
 void compute_force_and_update_particles(cell *cells, long ncside, int processId, int currentInteration){
+    
     for(long cellIndex = ncside;cellIndex < TOTAL_ELEMENTS - ncside; cellIndex++) {
         cell * currCell = &cells[cellIndex];
 
@@ -472,7 +470,7 @@ void compute_force_and_update_particles(cell *cells, long ncside, int processId,
                 //compute angle
                 double delta_x = neighboursList[neighboursListIndex].x - currentParticle->x;
                 double delta_y = neighboursList[neighboursListIndex].y - currentParticle->y;
-                double vector_angle = atan2(delta_y, delta_x); //problem
+                double vector_angle = atan2(delta_y, delta_x);
 
                 //compute force
                 double force = compute_magnitude_force(currentParticle, &neighboursList[neighboursListIndex]);
@@ -505,6 +503,7 @@ void compute_overall_center_mass(cell * cells, long ncside, int processId){
         cellIndex < TOTAL_ELEMENTS - (ncside * NUMBER_OF_GHOST_ROWS);
         cellIndex++) {
         particle_t * currentParticleList = cells[cellIndex].particles;
+        #pragma omp parallel for reduction(cntmass:overallCenterMass)
         for(long long particleIndex = 0; particleIndex < cells[cellIndex].nParticles; particleIndex++) {
             particle_t currentParticle = currentParticleList[particleIndex];
             overallCenterMass.x += currentParticle.x * currentParticle.m;
