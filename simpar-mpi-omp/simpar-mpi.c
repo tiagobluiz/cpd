@@ -276,18 +276,23 @@ void exchangeGhostRows (cell * cells, long ncside, int senderProcessId) {
         topParticlesToReceive[cellIndex].particles = (particle_t *)malloc(topParticlesToReceive[cellIndex].allocatedSpace * sizeof(particle_t));
         memcpy(topParticlesToReceive[cellIndex].particles, pointerTopParticlesToReceiveBuffer, topParticlesToReceive[cellIndex].nParticles * sizeof(particle_t));
         pointerTopParticlesToReceiveBuffer += topParticlesToReceive[cellIndex].nParticles;
-
-        for(long long particleIndex = 0;
-            senderProcessId == 0 && particleIndex < topParticlesToReceive[cellIndex].nParticles; particleIndex++){
-            topParticlesToReceive[cellIndex].particles[particleIndex].y -= MAX_COORDINATES_VALUE;
+        if(senderProcessId == 0){
+        #pragma omp parallel for
+            for(long long particleIndex = 0;
+                particleIndex < topParticlesToReceive[cellIndex].nParticles; particleIndex++){
+                topParticlesToReceive[cellIndex].particles[particleIndex].y -= MAX_COORDINATES_VALUE;
+            }
         }
 
         downParticlesToReceive[cellIndex].particles = (particle_t *)malloc(downParticlesToReceive[cellIndex].allocatedSpace * sizeof(particle_t));
         memcpy(downParticlesToReceive[cellIndex].particles, pointerDownParticlesToReceiveBuffer, downParticlesToReceive[cellIndex].nParticles * sizeof(particle_t));
         pointerDownParticlesToReceiveBuffer += downParticlesToReceive[cellIndex].nParticles;
-        for(long long particleIndex = 0;
-            (senderProcessId == NUMBER_OF_PROCESSES - 1) && particleIndex < downParticlesToReceive[cellIndex].nParticles; particleIndex++){
-            downParticlesToReceive[cellIndex].particles[particleIndex].y += MAX_COORDINATES_VALUE;
+        if(senderProcessId == NUMBER_OF_PROCESSES - 1){
+            #pragma omp parallel for
+            for(long long particleIndex = 0;
+                particleIndex < downParticlesToReceive[cellIndex].nParticles; particleIndex++){
+                downParticlesToReceive[cellIndex].particles[particleIndex].y += MAX_COORDINATES_VALUE;
+            }
         }
     }
 
@@ -438,7 +443,6 @@ void get_cell(long long unbounded_row, long long unbounded_column, cell *cells, 
  * @param cell_dimension    dimension of each cell
  */
 void compute_force_and_update_particles(cell *cells, long ncside, int processId, int currentInteration){
-    
     for(long cellIndex = ncside;cellIndex < TOTAL_ELEMENTS - ncside; cellIndex++) {
         cell * currCell = &cells[cellIndex];
 
