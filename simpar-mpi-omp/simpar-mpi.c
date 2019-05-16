@@ -31,7 +31,7 @@ typedef struct {
     double vy;
     double m;
     long arrayIndex;
-    long iteration; //Flag to check if a particle was already verified
+    long alreadyMoved; //Flag to check if a particle was already verified
     long creationIndex;
 }particle_t;
 
@@ -172,6 +172,9 @@ void clean_cells(cell * cells, long ncside, int processId){
     for (long cellIndex = 0; cellIndex < NUMBER_OF_ELEMENTS(processId, NUMBER_OF_PROCESSES, ncside); cellIndex++){
         cells[cellIndex].x = cells[cellIndex].y =
         cells[cellIndex].m = 0;
+         #pragma omp parallel for
+        for (long particleIndex = 0; particleIndex < cells[cellIndex].nParticles; particleIndex++)
+            cells[cellIndex].particles[particleIndex].alreadyMoved = 0;
     }
 }
 
@@ -381,9 +384,8 @@ double compute_magnitude_force(particle_t * a, cell * b) {
  * @param ncside    number of rows/columns of the matrix
  * @param processId ID of the current process
  */
-int update_particle_position(particle_t * particle, double Fx, double Fy, cell * cells, long ncside, int processId, long cellIndex, long long particleIndex, long iteration){
-    double oldy = particle->y;
-    particle->iteration = iteration;
+int update_particle_position(particle_t * particle, double Fx, double Fy, cell * cells, long ncside, int processId, long cellIndex, long long particleIndex){
+    particle->alreadyMoved = 1;
     double acceleration_x = Fx/particle->m;
     double acceleration_y = Fy/particle->m;
     particle->vx += acceleration_x;
@@ -392,8 +394,6 @@ int update_particle_position(particle_t * particle, double Fx, double Fy, cell *
     particle->y = particle->y + particle->vy + acceleration_y/2;
     x = fmod(x, MAX_COORDINATES_VALUE);
     particle->x = x < 0 ? x + MAX_COORDINATES_VALUE : x;
-//    if(cellIndex >= ncside * NUMBER_OF_GHOST_ROWS && cellIndex < (ncside * NUMBER_OF_GHOST_ROWS + ncside) &&
-//    (particle->y < oldy)) printf("A %d PCI %d | %0.2f %0.2f | oLDY %0.2f\n", processId, particle->creationIndex, particle->x, particle->y, oldy);
     //Since the particles may come from another process
     return move_particle(particle, cells, ncside, cellIndex, particleIndex, processId);
 }
@@ -442,7 +442,7 @@ void get_cell(long long unbounded_row, long long unbounded_column, cell *cells, 
  * @param ncside            number of cells in each side
  * @param cell_dimension    dimension of each cell
  */
-void compute_force_and_update_particles(cell *cells, long ncside, int processId, int currentInteration){
+void compute_force_and_update_particles(cell *cells, long ncside, int processId){
     for(long cellIndex = ncside;cellIndex < TOTAL_ELEMENTS - ncside; cellIndex++) {
         cell * currCell = &cells[cellIndex];
 
@@ -461,7 +461,7 @@ void compute_force_and_update_particles(cell *cells, long ncside, int processId,
 
         for(long long particleIndex = 0; particleIndex < currCell->nParticles; particleIndex++) {
             particle_t * currentParticle = &(currCell->particles[particleIndex]);
-            if (currentParticle->iteration == currentInteration) continue;
+            if (currentParticle->alreadyMoved == 1) continue;
 
             //resultant force in X and Y
             double Fx = 0;
@@ -481,8 +481,7 @@ void compute_force_and_update_particles(cell *cells, long ncside, int processId,
                 Fx += force * cos(vector_angle);
                 Fy += force * sin(vector_angle);
             }
-//            if(processId == 0 && cellIndex >= ncside * NUMBER_OF_GHOST_ROWS && cellIndex < (TOTAL_ELEMENTS - (ncside * NUMBER_OF_GHOST_ROWS))) printf("%d CI %d PCI %d| NX %0.2f NY %0.2f | DX %0.2f DY %0.2f | VA %0.2f | Fx %0.12f Fy %0.12f\n", processId, cellIndex, currentParticle->creationIndex, 0,0, 0, 0, 0, Fx, Fy);
-            particleIndex -= update_particle_position(currentParticle, Fx, Fy, cells, ncside, processId, cellIndex, particleIndex, currentInteration);
+            particleIndex -= update_particle_position(currentParticle, Fx, Fy, cells, ncside, processId, cellIndex, particleIndex);
         }
     }
 }
@@ -600,13 +599,14 @@ int main(int args_length, char* args[]) {
         //To simplify the index treatment (to start with 0) the cells matrix that goes through parameter omits the top ghost row
         compute_cell_center_mass(&cellMatrix[ncside * NUMBER_OF_GHOST_ROWS], ncside, rank);
 
-//        for (long cellIndex = ncside;rank == 0 &&  cellIndex < TOTAL_ELEMENTS - ncside; cellIndex++){
+       for (long cellIndex = ncside;cellIndex < TOTAL_ELEMENTS - ncside; cellIndex++){
 //            printf("> %d | CI %d (%0.2f, %0.2f; %0.2f)| NP %d AS %d\n", rank, cellIndex, cellMatrix[cellIndex].x, cellMatrix[cellIndex].y, cellMatrix[cellIndex].m, cellMatrix[cellIndex].nParticles, cellMatrix[cellIndex].allocatedSpace);
-//            for(long long particleIndex = 0;(cellIndex >= ncside && cellIndex < TOTAL_ELEMENTS - ncside) && particleIndex < cellMatrix[cellIndex].nParticles; particleIndex++){
-//                    printf("---> %d | CI %d | PCI %d | PAI %d PX %0.2f PY %0.2f PM %0.2f\n", rank, cellIndex, cellMatrix[cellIndex].particles[particleIndex].creationIndex, cellMatrix[cellIndex].particles[particleIndex].arrayIndex, cellMatrix[cellIndex].particles[particleIndex].x, cellMatrix[cellIndex].particles[particleIndex].y, cellMatrix[cellIndex].particles[particleIndex].m);
-//            }
-//        }
-        compute_force_and_update_particles(cellMatrix, ncside, rank, i);
+            //for(long long particleIndex = 0;(cellIndex >= ncside && cellIndex < TOTAL_ELEMENTS - ncside) && particleIndex < cellMatrix[cellIndex].nParticles; particleIndex++){
+              //      printf("---> %d | CI %d | PCI %d | %d | PAI %d PX %0.2f PY %0.2f PM %0.2f\n", rank, cellIndex, cellMatrix[cellIndex].particles[particleIndex].creationIndex, i, cellMatrix[cellIndex].particles[particleIndex].arrayIndex, cellMatrix[cellIndex].particles[particleIndex].x, cellMatrix[cellIndex].particles[particleIndex].y, cellMatrix[cellIndex].particles[particleIndex].m);
+            //}
+        }
+        compute_force_and_update_particles(cellMatrix, ncside, rank);
+        MPI_Barrier(MPI_COMM_WORLD);
     }
 
 
